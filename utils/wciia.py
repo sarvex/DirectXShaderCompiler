@@ -51,23 +51,23 @@ def process_code_owner(owner):
 code_owners_file = open("CODE_OWNERS.TXT", "r").readlines()
 code_owner = {}
 for line in code_owners_file:
-    for word in line.split():
-	if word == "N:":
-		name = line[2:].strip()
-		if code_owner:
-			process_code_owner(code_owner)
-			code_owner = {}
-		# reset the values
-		code_owner['name'] = name
-	if word == "E:":
-		email = line[2:].strip()
-		code_owner['email'] = email
-	if word == "D:":
-		description = line[2:].strip()
-		code_owner['description'] = description
-	if word == "F:":
-		filesfolders = line[2:].strip()
-		code_owner['filesfolders'].append(filesfolders)
+	for word in line.split():
+		if word == "D:":
+			description = line[2:].strip()
+			code_owner['description'] = description
+		elif word == "E:":
+			email = line[2:].strip()
+			code_owner['email'] = email
+		elif word == "F:":
+			filesfolders = line[2:].strip()
+			code_owner['filesfolders'].append(filesfolders)
+		elif word == "N:":
+			name = line[2:].strip()
+			if code_owner:
+				process_code_owner(code_owner)
+				code_owner = {}
+			# reset the values
+			code_owner['name'] = name
 	
 def find_owners(fpath):
 	onames = []

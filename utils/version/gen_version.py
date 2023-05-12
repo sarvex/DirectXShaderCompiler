@@ -91,31 +91,23 @@ class VersionGen():
         return self.rc_version_field_4_cache
 
     def quoted_version_str(self):
-        return '"{}.{}.{}.{}"'.format(
-            self.rc_version_field_1(),
-            self.rc_version_field_2(),
-            self.rc_version_field_3(),
-            self.rc_version_field_4())
+        return f'"{self.rc_version_field_1()}.{self.rc_version_field_2()}.{self.rc_version_field_3()}.{self.rc_version_field_4()}"'
 
     def product_version_str(self):
         if (self.options.no_commit_sha):
             return self.quoted_version_str()
-        pv = '"{}.{}.{}.{} '.format(
-                self.rc_version_field_1(),
-                self.rc_version_field_2(),
-                self.rc_version_field_3(),
-                self.rc_version_field_4())
+        pv = f'"{self.rc_version_field_1()}.{self.rc_version_field_2()}.{self.rc_version_field_3()}.{self.rc_version_field_4()} '
         if (self.current_branch != "HEAD"):
-             pv += '({}, {})"'.format(self.current_branch, get_last_commit_sha())
+            pv += f'({self.current_branch}, {get_last_commit_sha()})"'
         else:
-             pv += '({})"'.format(get_last_commit_sha())
+            pv += f'({get_last_commit_sha()})"'
         return pv
 
     def print_define(self, name, value):
-        print('#ifdef {}'.format(name))
-        print('#undef {}'.format(name))
+        print(f'#ifdef {name}')
+        print(f'#undef {name}')
         print('#endif')
-        print('#define {} {}'.format(name, value))
+        print(f'#define {name} {value}')
         print()
 
     def print_version(self):
@@ -131,7 +123,7 @@ class VersionGen():
         self.print_define('RC_COPYRIGHT',        '"(c) Microsoft Corporation. All rights reserved."')
         self.print_define('RC_PRODUCT_NAME',     '"Microsoft(r) DirectX for Windows(r) - Out Of Band"')
         self.print_define('RC_PRODUCT_VERSION',   self.product_version_str())
-        self.print_define('HLSL_TOOL_NAME',       '"{}"'.format(self.tool_name()))
+        self.print_define('HLSL_TOOL_NAME', f'"{self.tool_name()}"')
         self.print_define('HLSL_VERSION_MACRO',   'HLSL_TOOL_NAME " " RC_FILE_VERSION')
         self.print_define('HLSL_LLVM_IDENT',      'HLSL_TOOL_NAME " " RC_PRODUCT_VERSION')
 

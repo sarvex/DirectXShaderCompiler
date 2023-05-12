@@ -15,19 +15,19 @@ class Regen:
     def run(self):
         old,new = self.get_diff()
         if old != new:
-            print("+++    check lines changed {}".format(self.path))
+            print(f"+++    check lines changed {self.path}")
             self.print_diff(old, new)
             if not self.dryrun:
                 self.update_test(new)
         else:
-            print("--- no check lines changed {}".format(self.path))
+            print(f"--- no check lines changed {self.path}")
 
     def update_test(self, new):
         if self.checkout and not os.access(self.path, os.W_OK):
             self.sd("edit", self.path)
-        
+
         if not os.access(self.path, os.W_OK):
-            print("ERROR: unable to write to file '{}''".format(self.path))
+            print(f"ERROR: unable to write to file '{self.path}''")
             sys.exit(1)
 
         with open(self.path, "w") as f:
@@ -81,19 +81,20 @@ class Regen:
             if not line.strip():
                 continue
             if line.startswith("ScopeNestInfo:"):
-                grab_lines = True                
+                grab_lines = True
             if grab_lines:
-                check = "; CHECK: " + line
+                check = f"; CHECK: {line}"
                 check_lines.append(check)
-            
+
 
         return "\n".join(check_lines) 
     
     def get_old_check_lines(self):
-        check_lines = []
-        for line in self.get_test_content().splitlines():
-            if "; CHECK:" in line:
-                check_lines.append(line)
+        check_lines = [
+            line
+            for line in self.get_test_content().splitlines()
+            if "; CHECK:" in line
+        ]
         return "\n".join(check_lines)
 
 def parse_args():
@@ -102,12 +103,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description="regenerate check lines in test")
     parser.add_argument("--opt", default=default_opt,
                         help="path to opt")
-    parser.add_argument("--sd", action='store_true', help="sd edit the files")                    
+    parser.add_argument("--sd", action='store_true', help="sd edit the files")
     parser.add_argument("tests", nargs="*", help="glob patten of tests to run", default=["*.ll"])
     parser.add_argument("--dryrun", action="store_true")
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 def get_tests(options):
     test_files = []

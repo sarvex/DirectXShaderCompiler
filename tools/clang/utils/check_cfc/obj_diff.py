@@ -23,7 +23,7 @@ def disassemble(objfile):
                          stderr=subprocess.PIPE)
     (out, err) = p.communicate()
     if p.returncode or err:
-        print("Disassemble failed: {}".format(objfile))
+        print(f"Disassemble failed: {objfile}")
         sys.exit(1)
     return filter(keep_line, out.split(os.linesep))
 
@@ -32,7 +32,7 @@ def dump_debug(objfile):
     p = subprocess.Popen([disassembler, '-WliaprmfsoRt', objfile], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (out, err) = p.communicate()
     if p.returncode or err:
-        print("Dump debug failed: {}".format(objfile))
+        print(f"Dump debug failed: {objfile}")
         sys.exit(1)
     return filter(keep_line, out.split(os.linesep))
 
@@ -42,14 +42,10 @@ def first_diff(a, b, fromfile, tofile):
     are the first ones. Truncate data before sending to difflib.  Returns None
     is there is no difference."""
 
-    # Find first diff
-    first_diff_idx = None
-    for idx, val in enumerate(a):
-        if val != b[idx]:
-            first_diff_idx = idx
-            break
-
-    if first_diff_idx == None:
+    first_diff_idx = next(
+        (idx for idx, val in enumerate(a) if val != b[idx]), None
+    )
+    if first_diff_idx is None:
         # No difference
         return None
 
@@ -95,8 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('objfileb', nargs=1)
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
-    diff = compare_object_files(args.objfilea[0], args.objfileb[0])
-    if diff:
+    if diff := compare_object_files(args.objfilea[0], args.objfileb[0]):
         print("Difference detected")
         if args.verbose:
             print(diff)

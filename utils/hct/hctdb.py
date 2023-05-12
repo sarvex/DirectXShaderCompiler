@@ -94,7 +94,7 @@ class db_dxil_inst(object):
         return self.name
     
     def fully_qualified_name(self):
-        return "{}::{}".format(self.fully_qualified_name_prefix, self.name)
+        return f"{self.fully_qualified_name_prefix}::{self.name}"
 
 class db_dxil_metadata(object):
     "A representation for a metadata record"
@@ -147,7 +147,7 @@ class db_dxil_valrule(object):
         self.enum_name = name.replace(".", "") # remove period for enum name
         self.group_name = self.name[:self.name.index(".")]  # group name, eg META
         self.rule_name = self.name[self.name.index(".")+1:] # rule name, eg KNOWN
-        self.definition = "Check" + self.group_name + self.rule_name # function name that defines this constraint
+        self.definition = f"Check{self.group_name}{self.rule_name}"
         self.is_disabled = False            # True if the validation rule does not apply
         self.err_msg = ""                   # error message associated with rule
         self.category = ""                  # classification for this rule
@@ -199,18 +199,13 @@ class db_dxil(object):
 
     def build_indices(self):
         "Build a name_idx dictionary with instructions and an enum_idx dictionary with enumeration types"
-        self.name_idx = {}
-        for i in self.instr:
-            self.name_idx[i.name] = i
-        self.enum_idx = {}
-        for i in self.enums:
-            self.enum_idx[i.name] = i
+        self.name_idx = {i.name: i for i in self.instr}
+        self.enum_idx = {i.name: i for i in self.enums}
 
     def build_opcode_enum(self):
         # Build enumeration from instructions
         OpCodeEnum = db_dxil_enum("OpCode", "Enumeration for operations specified by DXIL")
-        class_dict = {}
-        class_dict["LlvmInst"] = "LLVM Instructions"
+        class_dict = {"LlvmInst": "LLVM Instructions"}
         for i in self.instr:
             if i.is_dxil_op:
                 v = db_dxil_enum_value(i.dxil_op, i.dxil_opid, i.doc)
@@ -242,14 +237,14 @@ class db_dxil(object):
         val = None
         for i in it:
             i_val = pred(i)
-            if not val is None:
+            if val is not None:
                 assert val + 1 == i_val, "values in predicate are not sequential and dense, %d follows %d for %s" % (i_val, val, name_proj(i))
             val = i_val
 
     def set_op_count_for_version(self, major, minor, op_count):
-        info = self.dxil_version_info.setdefault((major, minor), dict())
+        info = self.dxil_version_info.setdefault((major, minor), {})
         info['NumOpCodes'] = op_count
-        info['NumOpClasses'] = len(set([op.dxil_class for op in self.instr]))
+        info['NumOpClasses'] = len({op.dxil_class for op in self.instr})
 
     def populate_categories_and_models(self):
         "Populate the category and shader_stages member of instructions."
@@ -466,7 +461,7 @@ class db_dxil(object):
         retvoid_param = db_dxil_param(0, "v", "", "no return value")
         retoload_param = db_dxil_param(0, "$o", "", "no return value")
         oload_all_arith = "hfd1wil" # note that 8 is missing
-        oload_all_arith_v = "v" + oload_all_arith
+        oload_all_arith_v = f"v{oload_all_arith}"
         oload_int_arith = "wil"    # note that 8 is missing
         oload_int_arith_b = "1wil" # note that 8 is missing
         oload_float_arith = "hfd"

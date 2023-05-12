@@ -30,14 +30,13 @@ def format_comment(prefix, val):
     while l:
         if l < content_width:
             result += prefix + val.strip()
-            result += "\n"
             l = 0
         else:
             split_idx = val.rfind(" ", 0, content_width)
             result += prefix + val[:split_idx].strip()
-            result += "\n"
             val = val[split_idx+1:]
             l = len(val)
+        result += "\n"
     return result
 
 def format_rst_table(list_of_tuples):
@@ -79,16 +78,13 @@ def build_range_tuples(i):
     for val in i:
         if low_bound is None:
             low_bound = val
-            high_bound = val
         else:
-            assert(not high_bound is None)
-            if val == high_bound + 1:
-                high_bound = val
-            else:
+            assert high_bound is not None
+            if val != high_bound + 1:
                 yield (low_bound, high_bound)
                 low_bound = val
-                high_bound = val
-    if not low_bound is None:
+        high_bound = val
+    if low_bound is not None:
         yield (low_bound, high_bound)
 
 def build_range_code(var, i):
@@ -97,13 +93,10 @@ def build_range_code(var, i):
     result = ""
     for r in ranges:
         if r[0] == r[1]:
-            cond = var + " == " + str(r[0])
+            cond = f"{var} == {str(r[0])}"
         else:
             cond = "(%d <= %s && %s <= %d)" % (r[0], var, var, r[1])
-        if result == "":
-            result = cond
-        else:
-            result = result + " || " + cond
+        result = cond if result == "" else f"{result} || {cond}"
     return result
 
 class db_docsref_gen:
@@ -111,9 +104,19 @@ class db_docsref_gen:
     def __init__(self, db):
         self.db = db
         instrs = [i for i in self.db.instr if i.is_dxil_op]
-        instrs = sorted(instrs, key=lambda v : ("" if v.category == None else v.category) + "." + v.name)
+        instrs = sorted(
+            instrs,
+            key=lambda v: ("" if v.category is None else v.category)
+            + "."
+            + v.name,
+        )
         self.instrs = instrs
-        val_rules = sorted(db.val_rules, key=lambda v : ("" if v.category == None else v.category) + "." + v.name)
+        val_rules = sorted(
+            db.val_rules,
+            key=lambda v: ("" if v.category is None else v.category)
+            + "."
+            + v.name,
+        )
         self.val_rules = val_rules
 
     def print_content(self):
@@ -136,39 +139,52 @@ class db_docsref_gen:
     def print_instruction_details(self):
         print("<h2>Instruction Details</h2>")
         for i in self.instrs:
-            print("<h3><a name='i%s'>%s</a></h3>" % (i.name, i.name))
+            print(f"<h3><a name='i{i.name}'>{i.name}</a></h3>")
             print("<div>Opcode: %d. This instruction %s.</div>" % (i.dxil_opid, i.doc))
             if i.remarks:
                 # This is likely a .rst fragment, but this will do for now.
-                print("<div> " + i.remarks + "</div>")
+                print(f"<div> {i.remarks}</div>")
             print("<div>Operands:</div>")
             print("<ul>")
             for o in i.ops:
                 if o.pos == 0:
-                    print("<li>result: %s - %s</li>" % (o.llvm_type, o.doc))
+                    print(f"<li>result: {o.llvm_type} - {o.doc}</li>")
                 else:
-                    enum_desc = "" if o.enum_name == "" else " one of %s: %s" % (o.enum_name, ",".join(db.enum_idx[o.enum_name].value_names()))
-                    print("<li>%d - %s: %s%s%s</li>" % (o.pos - 1, o.name, o.llvm_type, "" if o.doc == "" else " - " + o.doc, enum_desc))
+                    enum_desc = (
+                        ""
+                        if o.enum_name == ""
+                        else f' one of {o.enum_name}: {",".join(db.enum_idx[o.enum_name].value_names())}'
+                    )
+                    print(
+                        "<li>%d - %s: %s%s%s</li>"
+                        % (
+                            o.pos - 1,
+                            o.name,
+                            o.llvm_type,
+                            "" if o.doc == "" else f" - {o.doc}",
+                            enum_desc,
+                        )
+                    )
             print("</ul>")
             print("<div><a href='#Instructions'>(top)</a></div>")
 
     def print_valrule_details(self):
         print("<h2>Rule Details</h2>")
         for i in self.val_rules:
-            print("<h3><a name='r%s'>%s</a></h3>" % (i.name, i.name))
-            print("<div>" + i.doc + "</div>")
+            print(f"<h3><a name='r{i.name}'>{i.name}</a></h3>")
+            print(f"<div>{i.doc}</div>")
             print("<div><a href='#Rules'>(top)</a></div>")
 
     def print_toc(self, name, aprefix, values):
-        print("<h2><a name='" + name + "'>" + name + "</a></h2>")
+        print(f"<h2><a name='{name}'>{name}</a></h2>")
         last_category = ""
         for i in values:
             if i.category != last_category:
                 if last_category != None:
                     print("</ul>")
-                print("<div><b>%s</b></div><ul>" % i.category)
+                print(f"<div><b>{i.category}</b></div><ul>")
                 last_category = i.category
-            print("<li><a href='#" + aprefix + "%s'>%s</a></li>" % (i.name, i.name))
+            print(f"<li><a href='#{aprefix}" + f"{i.name}'>{i.name}</a></li>")
         print("</ul>")
 
     def print_footer(self):
@@ -218,11 +234,15 @@ class db_instrhelp_gen:
     def op_type(self, o):
         if o.llvm_type in self.llvm_type_map:
             return self.llvm_type_map[o.llvm_type].name
-        raise ValueError("Don't know how to describe type %s for operand %s." % (o.llvm_type, o.name))
+        raise ValueError(
+            f"Don't know how to describe type {o.llvm_type} for operand {o.name}."
+        )
     def op_size(self, o):
         if o.llvm_type in self.llvm_type_map:
             return self.llvm_type_map[o.llvm_type].bits
-        raise ValueError("Don't know how to describe type %s for operand %s." % (o.llvm_type, o.name))
+        raise ValueError(
+            f"Don't know how to describe type {o.llvm_type} for operand {o.name}."
+        )
 
     def op_const_expr(self, o):
         return "(%s)(llvm::dyn_cast<llvm::ConstantInt>(Instr->getOperand(%d))->getZExtValue())" % (self.op_type(o), o.pos - 1)
@@ -234,13 +254,13 @@ class db_instrhelp_gen:
         for i in self.db.instr:
             if i.is_reserved: continue
             if i.inst_helper_prefix:
-                struct_name = "%s_%s" % (i.inst_helper_prefix, i.name)
+                struct_name = f"{i.inst_helper_prefix}_{i.name}"
             elif i.is_dxil_op:
-                struct_name = "DxilInst_%s" % i.name
+                struct_name = f"DxilInst_{i.name}"
             else:
-                struct_name = "LlvmInst_%s" % i.name
+                struct_name = f"LlvmInst_{i.name}"
             if i.doc:
-                print("/// This instruction %s" % i.doc)
+                print(f"/// This instruction {i.doc}")
             print("struct %s {" % struct_name)
             print("  llvm::Instruction *Instr;")
             print("  // Construction and identification")
@@ -248,9 +268,9 @@ class db_instrhelp_gen:
             print("  operator bool() const {")
             if i.is_dxil_op:
                 op_name = i.fully_qualified_name()
-                print("    return %s(Instr, %s);" % (self.IsDxilOpFuncCallInst, op_name))
+                print(f"    return {self.IsDxilOpFuncCallInst}(Instr, {op_name});")
             else:
-                print("    return Instr->getOpcode() == llvm::Instruction::%s;" % i.name)
+                print(f"    return Instr->getOpcode() == llvm::Instruction::{i.name};")
             print("  }")
             print("  // Validation support")
             print("  bool isAllowed() const { return %s; }" % self.bool_lit(i.is_allowed))
@@ -280,10 +300,9 @@ class db_instrhelp_gen:
                             AccessorsWritten = True
                         print("  llvm::Value *get_%s() const { return Instr->getOperand(%d); }" % (o.name, o.pos - 1))
                         print("  void set_%s(llvm::Value *val) { Instr->setOperand(%d, val); }" % (o.name, o.pos - 1))
-                        if o.is_const:
-                            if o.llvm_type in self.llvm_type_map:
-                                print("  %s get_%s_val() const { return %s; }" % (self.op_type(o), o.name, self.op_const_expr(o)))
-                                print("  void set_%s_val(%s val) { Instr->setOperand(%d, %s); }" % (o.name, self.op_type(o), o.pos - 1, self.op_set_const_expr(o)))
+                        if o.is_const and o.llvm_type in self.llvm_type_map:
+                            print("  %s get_%s_val() const { return %s; }" % (self.op_type(o), o.name, self.op_const_expr(o)))
+                            print("  void set_%s_val(%s val) { Instr->setOperand(%d, %s); }" % (o.name, self.op_type(o), o.pos - 1, self.op_set_const_expr(o)))
             print("};")
             print("")
 
@@ -301,18 +320,23 @@ class db_enumhelp_gen:
         }
 
     def print_enum(self, e, **kwargs):
-        print("// %s" % e.doc)
+        print(f"// {e.doc}")
         print("enum class %s : unsigned {" % e.name)
         hide_val = kwargs.get("hide_val", False)
         sorted_values = e.values
         if kwargs.get("sort_val", True):
-            sorted_values = sorted(e.values, key=lambda v : ("" if v.category == None else v.category) + "." + v.name)
+            sorted_values = sorted(
+                e.values,
+                key=lambda v: ("" if v.category is None else v.category)
+                + "."
+                + v.name,
+            )
         last_category = None
         for v in sorted_values:
             if v.category != last_category:
                 if last_category != None:
                     print("")
-                print("  // %s" % v.category)
+                print(f"  // {v.category}")
                 last_category = v.category
 
             line_format = "  {name}"
@@ -324,15 +348,20 @@ class db_enumhelp_gen:
             print(line_format.format(name=v.name, value=v.value, doc=v.doc))
         if e.name in self.lastEnumNames:
             lastName = self.lastEnumNames[e.name]
-            versioned = ["%s_Dxil_%d_%d = %d," % (lastName, major, minor, info[lastName])
-                         for (major, minor), info in sorted(self.db.dxil_version_info.items())
-                         if lastName in info]
-            if versioned:
+            if versioned := [
+                "%s_Dxil_%d_%d = %d," % (lastName, major, minor, info[lastName])
+                for (major, minor), info in sorted(
+                    self.db.dxil_version_info.items()
+                )
+                if lastName in info
+            ]:
                 print("")
                 for val in versioned:
-                    print("  " + val)
+                    print(f"  {val}")
             print("")
-            print("  " + lastName + " = " + str(len(sorted_values)) + " // exclusive last value of enumeration")
+            print(
+                f"  {lastName} = {len(sorted_values)} // exclusive last value of enumeration"
+            )
         print("};")
 
     def print_rdat_enum(self, e, **kwargs):
@@ -378,17 +407,35 @@ class db_oload_gen:
         lower_exceptions = { "CBufferLoad" : "cbufferLoad", "CBufferLoadLegacy" : "cbufferLoadLegacy", "GSInstanceID" : "gsInstanceID" }
         lower_fn = lambda t: lower_exceptions[t] if t in lower_exceptions else t[:1].lower() + t[1:]
         attr_dict = { "": "None", "ro": "ReadOnly", "rn": "ReadNone", "nd": "NoDuplicate", "nr": "NoReturn", "wv" : "None" }
-        attr_fn = lambda i : "Attribute::" + attr_dict[i.fn_attr] + ","
+        attr_fn = lambda i: f"Attribute::{attr_dict[i.fn_attr]},"
         for i in self.instrs:
             if last_category != i.category:
                 if last_category != None:
                     print("")
                 print("  // {category:118}  void,     h,     f,     d,    i1,    i8,   i16,   i32,   i64,   udt,   obj ,  function attribute".format(category=i.category))
                 last_category = i.category
-            print("  {{  {OC}::{name:24} {quotName:27} {OCC}::{className:25} {classNameQuot:28} {{{v:>6},{h:>6},{f:>6},{d:>6},{b:>6},{e:>6},{w:>6},{i:>6},{l:>6},{u:>6},{o:>6}}}, {attr:20} }},".format(
-                name=i.name+",", quotName='"'+i.name+'",', className=i.dxil_class+",", classNameQuot='"'+lower_fn(i.dxil_class)+'",',
-                v=f(i,"v"), h=f(i,"h"), f=f(i,"f"), d=f(i,"d"), b=f(i,"1"), e=f(i,"8"), w=f(i,"w"), i=f(i,"i"), l=f(i,"l"), u=f(i,"u"), o=f(i,"o"), attr=attr_fn(i),
-                OC=self.OC, OCC=self.OCC))
+            print(
+                "  {{  {OC}::{name:24} {quotName:27} {OCC}::{className:25} {classNameQuot:28} {{{v:>6},{h:>6},{f:>6},{d:>6},{b:>6},{e:>6},{w:>6},{i:>6},{l:>6},{u:>6},{o:>6}}}, {attr:20} }},".format(
+                    name=f"{i.name},",
+                    quotName=f'"{i.name}",',
+                    className=f"{i.dxil_class},",
+                    classNameQuot=f'"{lower_fn(i.dxil_class)}",',
+                    v=f(i, "v"),
+                    h=f(i, "h"),
+                    f=f(i, "f"),
+                    d=f(i, "d"),
+                    b=f(i, "1"),
+                    e=f(i, "8"),
+                    w=f(i, "w"),
+                    i=f(i, "i"),
+                    l=f(i, "l"),
+                    u=f(i, "u"),
+                    o=f(i, "o"),
+                    attr=attr_fn(i),
+                    OC=self.OC,
+                    OCC=self.OCC,
+                )
+            )
         print("};")
 
     def print_opfunc_table(self):
@@ -438,17 +485,19 @@ class db_oload_gen:
             if last_category != i.category:
                 if last_category != None:
                     print("")
-                print("    // %s" % i.category)
+                print(f"    // {i.category}")
                 last_category = i.category
-            line = "  case OpCode::{name:24}".format(name = i.name + ":")
+            line = "  case OpCode::{name:24}".format(name=f"{i.name}:")
             for index, o in enumerate(i.ops):
-                assert o.llvm_type in op_type_texts, "llvm type %s in instruction %s is unknown" % (o.llvm_type, i.name)
+                assert (
+                    o.llvm_type in op_type_texts
+                ), f"llvm type {o.llvm_type} in instruction {i.name} is unknown"
                 op_type_text = op_type_texts[o.llvm_type]
                 if index == 0:
                     line = line + "{val:13}".format(val=op_type_text)
                 else:
                     line = line + "{val:9}".format(val=op_type_text)
-            line = line + "break;"
+            line = f"{line}break;"
             print(line)
 
     def print_opfunc_oload_type(self):
@@ -503,7 +552,7 @@ class db_oload_gen:
                         index_dict[index].append(instr.name)
                     in_param_ty = True
                     break
-                if (op_type == udt_ty or op_type == obj_ty):
+                if op_type in [udt_ty, obj_ty]:
                     # Skip return op
                     index = index - 1
                     if index not in index_dict:
@@ -517,7 +566,7 @@ class db_oload_gen:
                 continue
 
             # No overload, just return the single oload_type.
-            assert len(instr.oload_types)==1, "overload no elt_ty %s" % (instr.name)
+            assert len(instr.oload_types)==1, f"overload no elt_ty {instr.name}"
             ty = instr.oload_types[0]
             type_code_texts = {
             "d": "Type::getDoubleTy(Ctx)",
@@ -532,7 +581,7 @@ class db_oload_gen:
             "u": "Type::getInt32PtrTy(Ctx)",
             "o": "Type::getInt32PtrTy(Ctx)",
             }
-            assert ty in type_code_texts, "llvm type %s is unknown" % (ty)
+            assert ty in type_code_texts, f"llvm type {ty} is unknown"
             ty_code = type_code_texts[ty]
 
             if ty_code not in single_dict:
@@ -545,15 +594,15 @@ class db_oload_gen:
             for opcode in opcodes:
                 line = line + "case OpCode::{name}".format(name = opcode + ":\n")
 
-            line = line + "  DXASSERT_NOMSG(FT->getNumParams() > " + str(index) + ");\n"
-            line = line + "  return FT->getParamType(" + str(index) + ");"
+            line = f"{line}  DXASSERT_NOMSG(FT->getNumParams() > {str(index)}" + ");\n"
+            line = f"{line}  return FT->getParamType({str(index)});"
             print(line)
 
         for code, opcodes in single_dict.items():
             line = ""
             for opcode in opcodes:
                 line = line + "case OpCode::{name}".format(name = opcode + ":\n")
-            line = line + "  return " + code + ";"
+            line = f"{line}  return {code};"
             print(line)
 
         line = ""
@@ -587,19 +636,26 @@ class db_valfns_gen:
             return "int8_t"
         if o.llvm_type == "u8":
             return "uint8_t"
-        raise ValueError("Don't know how to describe type %s for operand %s." % (o.llvm_type, o.name))
+        raise ValueError(
+            f"Don't know how to describe type {o.llvm_type} for operand {o.name}."
+        )
 
     def op_const_expr(self, o):
-        if o.llvm_type == "i8" or o.llvm_type == "u8":
+        if o.llvm_type in ["i8", "u8"]:
             return "(%s)(llvm::dyn_cast<llvm::ConstantInt>(Instr->getOperand(%d))->getZExtValue())" % (self.op_type(o), o.pos - 1)
-        raise ValueError("Don't know how to describe type %s for operand %s." % (o.llvm_type, o.name))
+        raise ValueError(
+            f"Don't know how to describe type {o.llvm_type} for operand {o.name}."
+        )
 
     def print_body(self):
         llvm_instrs = [i for i in self.db.instr if i.is_allowed and not i.is_dxil_op]
         print("static bool IsLLVMInstructionAllowed(llvm::Instruction &I) {")
-        self.print_comment("  // ", "Allow: %s" % ", ".join([i.name + "=" + str(i.llvm_id) for i in llvm_instrs]))
+        self.print_comment(
+            "  // ",
+            f'Allow: {", ".join([f"{i.name}={str(i.llvm_id)}" for i in llvm_instrs])}',
+        )
         print("  unsigned op = I.getOpcode();")
-        print("  return %s;" % build_range_code("op", [i.llvm_id for i in llvm_instrs]))
+        print(f'  return {build_range_code("op", [i.llvm_id for i in llvm_instrs])};')
         print("}")
         print("")
 
@@ -618,16 +674,17 @@ class macro_table_gen:
         widths = [  functools.reduce(max, [   len(row[i])
                                     for row in table], 1)
                     for i in range(len(table[0]))]
-        formatted = []
-        for row in table:
-            formatted.append(self.format_row(row, widths, *args, **kwargs))
-        return formatted
+        return [self.format_row(row, widths, *args, **kwargs) for row in table]
 
     def print_table(self, table, macro_name):
         formatted = self.format_table(table)
-        print(  '//   %s\n' % formatted[0] +
-                '#define %s(ROW) \\\n' % macro_name +
-                ' \\\n'.join(['  ROW(%s)' % frow for frow in formatted[1:]]))
+        print(
+            (
+                '//   %s\n' % formatted[0]
+                + '#define %s(ROW) \\\n' % macro_name
+                + ' \\\n'.join([f'  ROW({frow})' for frow in formatted[1:]])
+            )
+        )
 
 class db_sigpoint_gen(macro_table_gen):
     "A generator for SigPoint tables."
@@ -724,7 +781,7 @@ def get_hlsl_intrinsics():
     for i in sorted(db.intrinsics, key=lambda x: x.key):
         if last_ns != i.ns:
             last_ns = i.ns
-            id_prefix = "IOP" if last_ns == "Intrinsics" or last_ns == "VkIntrinsics" else "MOP" # SPIRV Change
+            id_prefix = "IOP" if last_ns in ["Intrinsics", "VkIntrinsics"] else "MOP"
             if (len(ns_table)):
                 result += ns_table + "};\n"
                 # SPIRV Change Starts
@@ -748,7 +805,7 @@ def get_hlsl_intrinsics():
             if name == i.name and i.hidden:
                 # First parameter defines intrinsic name for parsing in HLSL.
                 # Prepend '$hidden$' for hidden intrinsic so it can't be used in HLSL.
-                name = "$hidden$" + name
+                name = f"$hidden${name}"
             result += "    {\"%s\", %s, %s, %s, %s, %s, %s, %s},\n" % (
                 name, p.param_qual, p.template_id, p.template_list,
                 p.component_id, p.component_list, p.rows, p.cols)
@@ -778,8 +835,7 @@ def enum_hlsl_intrinsics():
     result += "  // unsigned\n"
 
     for i in sorted(db.intrinsics, key=lambda x: x.key):
-        if (i.unsigned_op != ""):
-          if (i.unsigned_op not in enumed):
+        if (i.unsigned_op != "") and (i.unsigned_op not in enumed):
             result += "  %s,\n" % (i.unsigned_op)
             enumed.append(i.unsigned_op)
 
@@ -792,8 +848,7 @@ def has_unsigned_hlsl_intrinsics():
     enumed = []
     # unsigned
     for i in sorted(db.intrinsics, key=lambda x: x.key):
-        if (i.unsigned_op != ""):
-          if (i.enum_name not in enumed):
+        if (i.unsigned_op != "") and (i.enum_name not in enumed):
             result += "  case IntrinsicOp::%s:\n" % (i.enum_name)
             enumed.append(i.enum_name)
     return result
@@ -804,8 +859,7 @@ def get_unsigned_hlsl_intrinsics():
     enumed = []
     # unsigned
     for i in sorted(db.intrinsics, key=lambda x: x.key):
-        if (i.unsigned_op != ""):
-          if (i.enum_name not in enumed):
+        if (i.unsigned_op != "") and (i.enum_name not in enumed):
             enumed.append(i.enum_name)
             result += "  case IntrinsicOp::%s:\n" % (i.enum_name)
             result += "    return static_cast<unsigned>(IntrinsicOp::%s);\n" % (i.unsigned_op)
@@ -843,7 +897,12 @@ def get_valrule_text():
     db = get_db_dxil()
     result = "switch(value) {\n"
     for v in db.enum_idx["ValidationRule"].values:
-        result += "  case hlsl::ValidationRule::" + v.name + ": return \"" + v.err_msg + "\";\n"
+        result += (
+            f"  case hlsl::ValidationRule::{v.name}"
+            + ": return \""
+            + v.err_msg
+            + "\";\n"
+        )
     result += "}\n"
     return result
 
@@ -854,13 +913,13 @@ def get_instrhelper():
 
 def get_instrs_pred(varname, pred, attr_name="dxil_opid"):
     db = get_db_dxil()
-    if type(pred) == str:
-        pred_fn = lambda i: getattr(i, pred)
-    else:
-        pred_fn = pred
+    pred_fn = (lambda i: getattr(i, pred)) if type(pred) == str else pred
     llvm_instrs = [i for i in db.instr if pred_fn(i)]
-    result = format_comment("// ", "Instructions: %s" % ", ".join([i.name + "=" + str(getattr(i, attr_name)) for i in llvm_instrs]))
-    result += "return %s;" % build_range_code(varname, [getattr(i, attr_name) for i in llvm_instrs])
+    result = format_comment(
+        "// ",
+        f'Instructions: {", ".join([f"{i.name}={str(getattr(i, attr_name))}" for i in llvm_instrs])}',
+    )
+    result += f"return {build_range_code(varname, [getattr(i, attr_name) for i in llvm_instrs])};"
     result += "\n"
     return result
 
@@ -884,10 +943,8 @@ def get_instrs_rst():
     db = get_db_dxil()
     instrs = [i for i in db.instr if i.is_allowed and not i.is_dxil_op]
     instrs = sorted(instrs, key=lambda v : v.llvm_id)
-    rows = []
-    rows.append(["Instruction", "Action", "Operand overloads"])
-    for i in instrs:
-        rows.append([i.name, i.doc, i.oload_types])
+    rows = [["Instruction", "Action", "Operand overloads"]]
+    rows.extend([i.name, i.doc, i.oload_types] for i in instrs)
     result = "\n\n" + format_rst_table(rows) + "\n\n"
     # Add detailed instruction information where available.
     for i in instrs:
@@ -898,14 +955,11 @@ def get_instrs_rst():
 def get_init_passes(category_libs):
     "Create a series of statements to initialize passes in a registry."
     db = get_db_dxil()
-    result = ""
-    for p in sorted(db.passes, key=lambda p : p.type_name):
-        # Skip if not in target category.
-        if (p.category_lib not in category_libs):
-            continue
-
-        result += "initialize%sPass(Registry);\n" % p.type_name
-    return result
+    return "".join(
+        "initialize%sPass(Registry);\n" % p.type_name
+        for p in sorted(db.passes, key=lambda p: p.type_name)
+        if p.category_lib in category_libs
+    )
 
 def get_pass_arg_names():
     "Return an ArrayRef of argument names based on passName"
@@ -947,19 +1001,18 @@ def get_is_pass_option_name():
     for k in sorted(db.pass_idx_args):
         result += prefix + "S.equals(\"%s\")" % k
         prefix = "\n  ||  "
-    return result + ";"
+    return f"{result};"
 
 def get_opcodes_rst():
     "Create an rst table of opcodes"
     db = get_db_dxil()
     instrs = [i for i in db.instr if i.is_allowed and i.is_dxil_op]
     instrs = sorted(instrs, key=lambda v : v.dxil_opid)
-    rows = []
-    rows.append(["ID", "Name", "Description"])
+    rows = [["ID", "Name", "Description"]]
     for i in instrs:
         op_name = i.dxil_op
         if i.remarks:
-            op_name = op_name + "_" # append _ to enable internal hyperlink on rst files
+            op_name = f"{op_name}_"
         rows.append([i.dxil_opid, op_name, i.doc])
     result = "\n\n" + format_rst_table(rows) + "\n\n"
     # Add detailed instruction information where available.
@@ -974,10 +1027,8 @@ def get_valrules_rst():
     db = get_db_dxil()
     rules = [i for i in db.val_rules if not i.is_disabled]
     rules = sorted(rules, key=lambda v : v.name)
-    rows = []
-    rows.append(["Rule Code", "Description"])
-    for i in rules:
-        rows.append([i.name, i.doc])
+    rows = [["Rule Code", "Description"]]
+    rows.extend([i.name, i.doc] for i in rules)
     return "\n\n" + format_rst_table(rows) + "\n\n"
 
 def get_opsigs():
@@ -998,7 +1049,7 @@ def get_opsigs():
         code += ")\""
         if inst_idx < len(instrs) - 1:
             code += ","
-        code += "  // " + i.name
+        code += f"  // {i.name}"
         code += "\n"
     code += "};\n"
     return code
@@ -1031,9 +1082,12 @@ def get_min_sm_and_mask_text():
     grouped_instrs = []
     code = ""
     def flush_instrs(grouped_instrs, last_model, last_model_translated, last_stage):
-        if len(grouped_instrs) == 0:
+        if not grouped_instrs:
             return ""
-        result = format_comment("// ", "Instructions: %s" % ", ".join([i.name + "=" + str(i.dxil_opid) for i in grouped_instrs]))
+        result = format_comment(
+            "// ",
+            f'Instructions: {", ".join([f"{i.name}={str(i.dxil_opid)}" for i in grouped_instrs])}',
+        )
         result += "if (" + build_range_code("op", [i.dxil_opid for i in grouped_instrs]) + ") {\n"
         default = True
         if last_model != (6,0):
@@ -1046,13 +1100,10 @@ def get_min_sm_and_mask_text():
                 result += "  }\n"
         if last_stage:
             default = False
-            result += "  mask = %s;\n" % ' | '.join([   'SFLAG(%s)' % shader_stage_to_ShaderKind[c]
-                                                        for c in last_stage
-                                                        ])
-        if default:
-            # don't write these out, instead fall through
-            return ""
-        return result + "  return;\n}\n"
+            result += "  mask = %s;\n" % ' | '.join(
+                [f'SFLAG({shader_stage_to_ShaderKind[c]})' for c in last_stage]
+            )
+        return "" if default else result + "  return;\n}\n"
 
     for i in instrs:
         if ((i.shader_model, i.shader_model_translated, i.shader_stages) !=
@@ -1093,9 +1144,12 @@ def get_valopcode_sm_text():
     grouped_instrs = []
     code = ""
     def flush_instrs(grouped_instrs, last_model, last_stage):
-        if len(grouped_instrs) == 0:
+        if not grouped_instrs:
             return ""
-        result = format_comment("// ", "Instructions: %s" % ", ".join([i.name + "=" + str(i.dxil_opid) for i in grouped_instrs]))
+        result = format_comment(
+            "// ",
+            f'Instructions: {", ".join([f"{i.name}={str(i.dxil_opid)}" for i in grouped_instrs])}',
+        )
         result += "if (" + build_range_code("op", [i.dxil_opid for i in grouped_instrs]) + ")\n"
         result += "  return "
 
@@ -1107,7 +1161,8 @@ def get_valopcode_sm_text():
             stage_cond = ' || '.join([check_pSM_for_shader_stage[c] for c in last_stage])
         if model_cond or stage_cond:
             result += '\n      && '.join(
-                ["(%s)" % expr for expr in (model_cond, stage_cond) if expr] )
+                [f"({expr})" for expr in (model_cond, stage_cond) if expr]
+            )
             return result + ";\n"
         else:
             # don't write these out, instead fall through
@@ -1164,15 +1219,15 @@ highest_shader_models = {4:1, 5:1, 6:highest_minor}
 def getShaderModels():
     shader_models = []
     for major, minor in highest_shader_models.items():
-        for i in range(0, minor+1):
-            shader_models.append(str(major) + "_" + str(i))
-
+        shader_models.extend(f"{str(major)}_{str(i)}" for i in range(0, minor+1))
     return shader_models;
 
 def get_highest_shader_model():
-    result = """static const unsigned kHighestMajor = %d;
-static const unsigned kHighestMinor = %d;"""%(highest_major, highest_minor)
-    return result
+    return """static const unsigned kHighestMajor = %d;
+static const unsigned kHighestMinor = %d;""" % (
+        highest_major,
+        highest_minor,
+    )
 
 def get_dxil_version_minor():
     return "const unsigned kDxilMinor = %d;"%highest_minor
@@ -1181,11 +1236,11 @@ def get_dxil_version_minor_int():
     return highest_minor
 
 def get_is_shader_model_plus():
-    result = ""
-
-    for i in range(0, highest_minor+1):
-        result += "bool IsSM%d%dPlus() const { return IsSMAtLeast(%d, %d); }\n"%(highest_major, i,highest_major, i)
-    return result
+    return "".join(
+        "bool IsSM%d%dPlus() const { return IsSMAtLeast(%d, %d); }\n"
+        % (highest_major, i, highest_major, i)
+        for i in range(0, highest_minor + 1)
+    )
 
 profile_to_kind = {"ps":"Kind::Pixel", "vs":"Kind::Vertex", "gs":"Kind::Geometry", "hs":"5_0", "ds":"5_0", "cs":"4_0", "lib":"6_1", "ms":"6_5", "as":"6_5"}
 
@@ -1212,9 +1267,17 @@ shader_profiles = [ shader_profile(0, "ps", "Kind::Pixel", "4_0", 32, 8),
              ]
 
 def getShaderProfiles():
-    # order match DXIL::ShaderKind.
-    profiles = (("ps", "4_0"), ("vs", "4_0"), ("gs", "4_0"), ("hs", "5_0"), ("ds", "5_0"), ("cs", "4_0"), ("lib", "6_1"), ("ms", "6_5"), ("as", "6_5"))
-    return profiles;
+    return (
+        ("ps", "4_0"),
+        ("vs", "4_0"),
+        ("gs", "4_0"),
+        ("hs", "5_0"),
+        ("ds", "5_0"),
+        ("cs", "4_0"),
+        ("lib", "6_1"),
+        ("ms", "6_5"),
+        ("as", "6_5"),
+    )
 
 def get_shader_models():
     result = ""
@@ -1247,15 +1310,14 @@ def get_shader_models():
                 input_size = profile.input_size
                 output_size = profile.output_size
 
-                if major == 4:
-                    if i == 0:
-                        if kind_name == "gs":
-                            input_size = 16
-                        elif kind_name == "vs":
-                            input_size = 16
-                            output_size = 16
+                if major == 4 and i == 0:
+                    if kind_name == "gs":
+                        input_size = 16
+                    elif kind_name == "vs":
+                        input_size = 16
+                        output_size = 16
 
-                sm_name = "%s_%s"%(kind_name,sm)
+                sm_name = f"{kind_name}_{sm}"
                 result += "SM(%s, %d, %d, \"%s\", %d, %d, %s),\n" % (enum_name, major, i, sm_name, input_size, output_size, UAV_info)
 
         if kind_name == "lib":
@@ -1306,7 +1368,7 @@ def build_shader_model_hash_idx_map():
                 sm = "%d_%d"%(major, i)
                 if (min_sm > sm):
                     continue
-                sm_name = "%s_%s"%(kind_name,sm)
+                sm_name = f"{kind_name}_{sm}"
                 hash_v = kind << 16 | major << 8 | i;
                 result += "{%d,%d}, //%s\n" % (hash_v, count, sm_name)
                 count += 1
@@ -1324,7 +1386,8 @@ def build_shader_model_hash_idx_map():
     return result
 
 def get_validation_version():
-    result = """// 1.0 is the first validator.
+    return (
+        """// 1.0 is the first validator.
 // 1.1 adds:
 // - ILDN container part support
 // 1.2 adds:
@@ -1343,8 +1406,9 @@ def get_validation_version():
 // - DXR 1.1 & RayQuery support
 *pMajor = 1;
 *pMinor = %d;
-""" % highest_minor
-    return result
+"""
+        % highest_minor
+    )
 
 def get_target_profiles():
     result = "HelpText<\"Set target profile. \\n"

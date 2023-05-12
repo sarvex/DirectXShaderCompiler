@@ -51,7 +51,7 @@ class TestProvider(object):
         self.queue = queue_impl()
         for i in range(len(tests)):
             self.queue.put(i)
-        for i in range(num_jobs):
+        for _ in range(num_jobs):
             self.queue.put(None)
 
     def cancel(self):
@@ -59,11 +59,7 @@ class TestProvider(object):
 
     def get(self):
         # Check if we are canceled.
-        if self.canceled_flag.value:
-          return None
-
-        # Otherwise take the next test.
-        return self.queue.get()
+        return None if self.canceled_flag.value else self.queue.get()
 
 class Tester(object):
     def __init__(self, run_instance, provider, consumer):
@@ -263,9 +259,10 @@ class Run(object):
 
     def _execute_tests_in_parallel(self, task_impl, provider, consumer, jobs):
         # Start all of the tasks.
-        tasks = [task_impl(target=run_one_tester,
-                           args=(self, provider, consumer))
-                 for i in range(jobs)]
+        tasks = [
+            task_impl(target=run_one_tester, args=(self, provider, consumer))
+            for _ in range(jobs)
+        ]
         for t in tasks:
             t.start()
 

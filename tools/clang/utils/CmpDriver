@@ -15,16 +15,14 @@ def splitArgs(s):
         if c == '"':
             if inQuote:
                 inQuote = False
-                yield current + '"'
+                yield f'{current}"'
             else:
                 inQuote = True
                 current = '"'
         elif inQuote:
+            current += c
             if c == '\\':
-                current += c
                 current += it.next()
-            else:
-                current += c
         elif not c.isspace():
             yield c
 

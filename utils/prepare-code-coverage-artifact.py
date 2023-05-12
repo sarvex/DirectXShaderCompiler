@@ -49,7 +49,7 @@ def prepare_html_report(host_llvm_cov, profile, report_dir, binaries,
                   '-show-line-counts-or-regions', '-Xdemangler', 'c++filt',
                   '-Xdemangler', '-n'] + restricted_dirs
     if compilation_dir:
-        invocation += ['-compilation-dir=' + compilation_dir]
+        invocation += [f'-compilation-dir={compilation_dir}']
     subprocess.check_call(invocation)
     with open(os.path.join(report_dir, 'summary.txt'), 'wb') as Summary:
         subprocess.check_call([host_llvm_cov, 'report'] + objects +

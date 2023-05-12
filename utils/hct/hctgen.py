@@ -37,14 +37,12 @@ def eprint(*args, **kwargs):
 def getNewline(args):
   if args.force_lf:
     return '\n'
-  if args.force_crlf:
-    return '\r\n'
-  return None
+  return '\r\n' if args.force_crlf else None
 
 def writeCodeTag(args):
   out = openOutput(args)
   if not args.input:
-    eprint('Writing %s requires --input' % args.mode)
+    eprint(f'Writing {args.mode} requires --input')
     return 1
 
   argsList = [args.input, args.output]
@@ -113,7 +111,7 @@ def writeDxcOptimizer(args):
     'HRESULT SetupRegistryPassForHLSL() {',
     '  try {',
     '    PassRegistry &Registry = *PassRegistry::getPassRegistry();\n']))
-  out.write(get_init_passes(set(["llvm", "dxil_gen"])))
+  out.write(get_init_passes({"llvm", "dxil_gen"}))
   out.write('\n'.join([
     '    // Not schematized - exclusively for compiler authors.',
     '    initializeCFGPrinterPasses(Registry);',
@@ -171,7 +169,7 @@ def writeDxilValidation(args):
 def writeDxilPIXPasses(args):
   out = openOutput(args)
   printHeader(out, "DxilPIXPasses.inc")
-  out.write(get_init_passes(set(["pix"])))
+  out.write(get_init_passes({"pix"}))
   out.write('\n')
   return 0
 
@@ -179,7 +177,7 @@ args = parser.parse_args()
 if args.force_lf and args.force_crlf:
   eprint('--force-lf and --force-crlf are mutually exclusive, only pass one')
   exit(1)
-writeFnName = 'write%s' % args.mode
+writeFnName = f'write{args.mode}'
 if writeFnName in locals():
   exit(locals()[writeFnName](args))
 else:

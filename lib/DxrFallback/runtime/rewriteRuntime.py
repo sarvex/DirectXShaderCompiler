@@ -8,7 +8,7 @@ source = open(sourceFilename).read()
 
 input = open(inputFilename).read()
 m = re.search(r'"nvptx"(.*?)attributes #', input, re.DOTALL)
-dxil = m.group(1)
+dxil = m[1]
 
 # split the string up to avoid  error C2026: string too big, trailing characters truncated
 lines = dxil.splitlines()
@@ -18,8 +18,7 @@ for line in lines:
     count += len(line)
     dxil.append(line)
     if count > 10000:
-        dxil.append(')AAA",')
-        dxil.append('R"AAA(')
+        dxil.extend((')AAA",', 'R"AAA('))
         count = 0
 dxil = '\n'.join(dxil)
 

@@ -22,12 +22,9 @@ import os
 import csv
 import sys
 
-def isExistingProject(PMapFile, projectID) :
+def isExistingProject(PMapFile, projectID):
     PMapReader = csv.reader(PMapFile)
-    for I in PMapReader:
-        if projectID == I[0]:
-            return True
-    return False    
+    return any(projectID == I[0] for I in PMapReader)    
 
 # Add a new project for testing: build it and add to the Project Map file.
 # Params:

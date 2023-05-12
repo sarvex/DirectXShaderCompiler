@@ -42,30 +42,27 @@ class TestingConfig:
                      'LD_PRELOAD', 'ASAN_OPTIONS', 'UBSAN_OPTIONS',
                      'LSAN_OPTIONS', 'ADB', 'ADB_SERIAL']
         for var in pass_vars:
-            val = os.environ.get(var, '')
-            # Check for empty string as some variables such as LD_PRELOAD cannot be empty
-            # ('') for OS's such as OpenBSD.
-            if val:
+            if val := os.environ.get(var, ''):
                 environment[var] = val
 
         if sys.platform == 'win32':
-            environment.update({
-                    'INCLUDE' : os.environ.get('INCLUDE',''),
-                    'PATHEXT' : os.environ.get('PATHEXT',''),
-                    'PYTHONUNBUFFERED' : '1',
-                    'TEMP' : os.environ.get('TEMP',''),
-                    'TMP' : os.environ.get('TMP',''),
-                    })
+            environment |= {
+                'INCLUDE': os.environ.get('INCLUDE', ''),
+                'PATHEXT': os.environ.get('PATHEXT', ''),
+                'PYTHONUNBUFFERED': '1',
+                'TEMP': os.environ.get('TEMP', ''),
+                'TMP': os.environ.get('TMP', ''),
+            }
 
         # The option to preserve TEMP, TMP, and TMPDIR.
         # This is intended to check how many temporary files would be generated
         # (and be not cleaned up) in automated builders.
         if 'LIT_PRESERVES_TMP' in os.environ:
-            environment.update({
-                    'TEMP' : os.environ.get('TEMP',''),
-                    'TMP' : os.environ.get('TMP',''),
-                    'TMPDIR' : os.environ.get('TMPDIR',''),
-                    })
+            environment |= {
+                'TEMP': os.environ.get('TEMP', ''),
+                'TMP': os.environ.get('TMP', ''),
+                'TMPDIR': os.environ.get('TMPDIR', ''),
+            }
 
         # Set the default available features based on the LitConfig.
         available_features = []
@@ -98,13 +95,11 @@ class TestingConfig:
         # Load the config script data.
         data = None
         if not OldPy:
-            f = open(path)
-            try:
-                data = f.read()
-            except:
-                litConfig.fatal('unable to load config file: %r' % (path,))
-            f.close()
-
+            with open(path) as f:
+                try:
+                    data = f.read()
+                except:
+                    litConfig.fatal('unable to load config file: %r' % (path,))
         # Execute the config script to initialize the object.
         cfg_globals = dict(globals())
         cfg_globals['config'] = self
@@ -172,8 +167,5 @@ class TestingConfig:
     @property
     def root(self):
         """root attribute - The root configuration for the test suite."""
-        if self.parent is None:
-            return self
-        else:
-            return self.parent.root
+        return self if self.parent is None else self.parent.root
 

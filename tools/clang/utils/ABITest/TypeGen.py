@@ -68,10 +68,10 @@ class EnumType(Type):
         result = ''
         for i, init in enumerate(self.enumerators):
             if i > 0:
-                result = result + ', '
+                result = f'{result}, '
             result = result + 'enum%dval%d_%d' % (self.index, i, self.unique_id)
             if init:
-                result = result + ' = %s' % (init)
+                result = f'{result} = {init}'
 
         return result
 
@@ -90,10 +90,7 @@ class RecordType(Type):
 
     def __str__(self):
         def getField(t):
-            if t.isBitField():
-                return "%s : %d;" % (t, t.getBitFieldSize())
-            else:
-                return "%s;" % t
+            return "%s : %d;" % (t, t.getBitFieldSize()) if t.isBitField() else f"{t};"
 
         return '%s { %s }'%(('struct','union')[self.isUnion],
                             ' '.join(map(getField, self.fields)))
@@ -137,7 +134,7 @@ class ArrayType(Type):
         elif self.size is not None:
             return '(%s)[%d]'%(self.elementType,self.size)
         else:
-            return '(%s)[]'%(self.elementType,)
+            return f'({self.elementType})[]'
 
     def getTypedefDef(self, name, printer):
         elementName = printer.getTypeName(self.elementType)
@@ -145,12 +142,8 @@ class ArrayType(Type):
             return 'typedef %s %s __attribute__ ((vector_size (%d)));'%(elementName,
                                                                         name,
                                                                         self.size)
-        else:
-            if self.size is None:
-                sizeStr = ''
-            else:
-                sizeStr = str(self.size)
-            return 'typedef %s %s[%s];'%(elementName, name, sizeStr)
+        sizeStr = '' if self.size is None else str(self.size)
+        return f'typedef {elementName} {name}[{sizeStr}];'
 
 class ComplexType(Type):
     def __init__(self, index, elementType):
@@ -158,10 +151,10 @@ class ComplexType(Type):
         self.elementType = elementType
 
     def __str__(self):
-        return '_Complex (%s)'%(self.elementType)
+        return f'_Complex ({self.elementType})'
 
     def getTypedefDef(self, name, printer):
-        return 'typedef _Complex %s %s;'%(printer.getTypeName(self.elementType), name)
+        return f'typedef _Complex {printer.getTypeName(self.elementType)} {name};'
 
 class FunctionType(Type):
     def __init__(self, index, returnType, argTypes):
@@ -170,26 +163,14 @@ class FunctionType(Type):
         self.argTypes = argTypes
 
     def __str__(self):
-        if self.returnType is None:
-            rt = 'void'
-        else:
-            rt = str(self.returnType)
-        if not self.argTypes:
-            at = 'void'
-        else:
-            at = ', '.join(map(str, self.argTypes))
-        return '%s (*)(%s)'%(rt, at)
+        rt = 'void' if self.returnType is None else str(self.returnType)
+        at = 'void' if not self.argTypes else ', '.join(map(str, self.argTypes))
+        return f'{rt} (*)({at})'
 
     def getTypedefDef(self, name, printer):
-        if self.returnType is None:
-            rt = 'void'
-        else:
-            rt = str(self.returnType)
-        if not self.argTypes:
-            at = 'void'
-        else:
-            at = ', '.join(map(str, self.argTypes))
-        return 'typedef %s (*%s)(%s);'%(rt, name, at)
+        rt = 'void' if self.returnType is None else str(self.returnType)
+        at = 'void' if not self.argTypes else ', '.join(map(str, self.argTypes))
+        return f'typedef {rt} (*{name})({at});'
 
 ###
 # Type enumerators
@@ -342,10 +323,7 @@ class ArrayTypeGenerator(TypeGenerator):
             else:
                 S = S - 1
         if S is not None:
-            if self.useZero:
-                size = S
-            else:
-                size = S + 1        
+            size = S if self.useZero else S + 1
         return ArrayType(N, False, self.typeGen.get(T), size)
 
 class RecordTypeGenerator(TypeGenerator):
@@ -361,9 +339,7 @@ class RecordTypeGenerator(TypeGenerator):
         if self.maxSize is aleph0:
             S =  aleph0 * self.typeGen.cardinality
         else:
-            S = 0
-            for i in range(self.maxSize+1):
-                S += M * (self.typeGen.cardinality ** i)
+            S = sum(M * (self.typeGen.cardinality ** i) for i in range(self.maxSize+1))
         self.cardinality = S
 
     def generateType(self, N):
@@ -385,13 +361,9 @@ class FunctionTypeGenerator(TypeGenerator):
         if self.maxSize is aleph0:
             S = aleph0 * self.typeGen.cardinality()
         elif self.useReturn:
-            S = 0
-            for i in range(1,self.maxSize+1+1):
-                S += self.typeGen.cardinality ** i
+            S = sum(self.typeGen.cardinality ** i for i in range(1,self.maxSize+1+1))
         else:
-            S = 0
-            for i in range(self.maxSize+1):
-                S += self.typeGen.cardinality ** i
+            S = sum(self.typeGen.cardinality ** i for i in range(self.maxSize+1))
         self.cardinality = S
     
     def generateType(self, N):
@@ -415,10 +387,7 @@ class AnyTypeGenerator(TypeGenerator):
         self._cardinality = None
         
     def getCardinality(self):
-        if self._cardinality is None:
-            return aleph0
-        else:
-            return self._cardinality
+        return aleph0 if self._cardinality is None else self._cardinality
     def setCardinality(self):
         self.bounds = [g.cardinality for g in self.generators]
         self._cardinality = sum(self.bounds)

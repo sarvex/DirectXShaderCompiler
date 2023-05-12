@@ -42,6 +42,6 @@ def test_kind_groups():
                     CursorKind.MACRO_INSTANTIATION,
                     CursorKind.INCLUSION_DIRECTIVE,
                     CursorKind.PREPROCESSING_DIRECTIVE):
-            assert len(group) == 0
+            assert not group
         else:
             assert len(group) == 1

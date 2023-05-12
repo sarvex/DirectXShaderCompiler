@@ -93,7 +93,7 @@ def executeShCmd(cmd, shenv, results):
                 redirects[2] = [r[1], 'a', None]
             elif r[0] == ('>&',2) and r[1] in '012':
                 redirects[2] = redirects[int(r[1])]
-            elif r[0] == ('>&',) or r[0] == ('&>',):
+            elif r[0] in [('>&',), ('&>',)]:
                 redirects[1] = redirects[2] = [r[1], 'w', None]
             elif r[0] == ('>',):
                 redirects[1] = [r[1], 'w', None]
@@ -206,14 +206,8 @@ def executeShCmd(cmd, shenv, results):
     procData[-1] = procs[-1].communicate()
 
     for i in range(len(procs) - 1):
-        if procs[i].stdout is not None:
-            out = procs[i].stdout.read()
-        else:
-            out = ''
-        if procs[i].stderr is not None:
-            err = procs[i].stderr.read()
-        else:
-            err = ''
+        out = procs[i].stdout.read() if procs[i].stdout is not None else ''
+        err = procs[i].stderr.read() if procs[i].stderr is not None else ''
         procData[i] = (out,err)
 
     # Read stderr out of the temp files.
@@ -222,9 +216,7 @@ def executeShCmd(cmd, shenv, results):
         procData[i] = (procData[i][0], f.read())
 
     def to_string(bytes):
-        if isinstance(bytes, str):
-            return bytes
-        return bytes.encode('utf-8')
+        return bytes if isinstance(bytes, str) else bytes.encode('utf-8')
 
     exitCode = None
     for i,(out,err) in enumerate(procData):
@@ -291,7 +283,7 @@ def executeScriptInternal(test, litConfig, tmpBase, commands, cwd):
 
     out = err = ''
     for i,(cmd, cmd_out,cmd_err,res) in enumerate(results):
-        out += 'Command %d: %s\n' % (i, ' '.join('"%s"' % s for s in cmd.args))
+        out += 'Command %d: %s\n' % (i, ' '.join(f'"{s}"' for s in cmd.args))
         out += 'Command %d Result: %r\n' % (i, res)
         out += 'Command %d Output:\n%s\n\n' % (i, cmd_out)
         out += 'Command %d Stderr:\n%s\n\n' % (i, cmd_err)
@@ -301,7 +293,7 @@ def executeScriptInternal(test, litConfig, tmpBase, commands, cwd):
 def executeScript(test, litConfig, tmpBase, commands, cwd):
     bashPath = litConfig.getBashPath();
     isWin32CMDEXE = (litConfig.isWindows and not bashPath)
-    script = tmpBase + '.script'
+    script = f'{tmpBase}.script'
     if isWin32CMDEXE:
         script += '.bat'
 
@@ -309,23 +301,18 @@ def executeScript(test, litConfig, tmpBase, commands, cwd):
     mode = 'w'
     if litConfig.isWindows and not isWin32CMDEXE:
       mode += 'b'  # Avoid CRLFs when writing bash scripts.
-    f = open(script, mode)
-    if isWin32CMDEXE:
-        f.write('\nif %ERRORLEVEL% NEQ 0 EXIT\n'.join(commands))
-    else:
-        if test.config.pipefail:
-            f.write('set -o pipefail;')
-        f.write('{ ' + '; } &&\n{ '.join(commands) + '; }')
-    f.write('\n')
-    f.close()
-
+    with open(script, mode) as f:
+        if isWin32CMDEXE:
+            f.write('\nif %ERRORLEVEL% NEQ 0 EXIT\n'.join(commands))
+        else:
+            if test.config.pipefail:
+                f.write('set -o pipefail;')
+            f.write('{ ' + '; } &&\n{ '.join(commands) + '; }')
+        f.write('\n')
     if isWin32CMDEXE:
         command = ['cmd','/c', script]
     else:
-        if bashPath:
-            command = [bashPath, script]
-        else:
-            command = ['/bin/sh', script]
+        command = [bashPath, script] if bashPath else ['/bin/sh', script]
         if litConfig.useValgrind:
             # FIXME: Running valgrind on sh is overkill. We probably could just
             # run on clang with no real loss.
@@ -354,8 +341,7 @@ def parseIntegratedTestScriptCommands(source_path):
     # version.
 
     keywords = ['RUN:', 'XFAIL:', 'REQUIRES:', 'UNSUPPORTED:', 'END.']
-    keywords_re = re.compile(
-        to_bytes("(%s)(.*)\n" % ("|".join(k for k in keywords),)))
+    keywords_re = re.compile(to_bytes("(%s)(.*)\n" % ("|".join(keywords), )))
 
     f = open(source_path, 'rb')
     try:
@@ -420,13 +406,17 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
     substitutions = list(extra_substitutions)
     substitutions.extend([('%%', '#_MARKER_#')])
     substitutions.extend(test.config.substitutions)
-    substitutions.extend([('%s', sourcepath),
-                          ('%S', sourcedir),
-                          ('%p', sourcedir),
-                          ('%{pathsep}', os.pathsep),
-                          ('%t', tmpBase + '.tmp'),
-                          ('%T', tmpDir),
-                          ('#_MARKER_#', '%')])
+    substitutions.extend(
+        [
+            ('%s', sourcepath),
+            ('%S', sourcedir),
+            ('%p', sourcedir),
+            ('%{pathsep}', os.pathsep),
+            ('%t', f'{tmpBase}.tmp'),
+            ('%T', tmpDir),
+            ('#_MARKER_#', '%'),
+        ]
+    )
 
     # "%/[STpst]" should be normalized.
     substitutions.extend([
@@ -487,6 +477,7 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
 
         # Strip the trailing newline and any extra whitespace.
         return ln.strip()
+
     script = [processLine(ln)
               for ln in script]
 
@@ -504,14 +495,17 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
                                  if f not in test.config.available_features]
     if missing_required_features:
         msg = ', '.join(missing_required_features)
-        return lit.Test.Result(Test.UNSUPPORTED,
-                               "Test requires the following features: %s" % msg)
+        return lit.Test.Result(
+            Test.UNSUPPORTED, f"Test requires the following features: {msg}"
+        )
     unsupported_features = [f for f in unsupported
                             if f in test.config.available_features]
     if unsupported_features:
         msg = ', '.join(unsupported_features)
-        return lit.Test.Result(Test.UNSUPPORTED,
-                    "Test is unsupported with the following features: %s" % msg)
+        return lit.Test.Result(
+            Test.UNSUPPORTED,
+            f"Test is unsupported with the following features: {msg}",
+        )
 
     if test.config.limit_to_features:
         # Check that we have one of the limit_to_features features in requires.
@@ -519,8 +513,10 @@ def parseIntegratedTestScript(test, normalize_slashes=False,
                                    if f in requires]
         if not limit_to_features_tests:
             msg = ', '.join(test.config.limit_to_features)
-            return lit.Test.Result(Test.UNSUPPORTED,
-                 "Test requires one of the limit_to_features features %s" % msg)
+            return lit.Test.Result(
+                Test.UNSUPPORTED,
+                f"Test requires one of the limit_to_features features {msg}",
+            )
 
     return script,tmpBase,execdir
 
@@ -537,11 +533,7 @@ def _runShTest(test, litConfig, useExternalSh,
         return res
 
     out,err,exitCode = res
-    if exitCode == 0:
-        status = Test.PASS
-    else:
-        status = Test.FAIL
-
+    status = Test.PASS if exitCode == 0 else Test.FAIL
     # Form the output log.
     output = """Script:\n--\n%s\n--\nExit Code: %d\n\n""" % (
         '\n'.join(script), exitCode)

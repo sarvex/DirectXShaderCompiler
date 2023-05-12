@@ -82,9 +82,18 @@ def add_test_case_int(test_name, inst_names, validation_type, validation_toleran
         input_lists_16 = kwargs["input_16"]
     if "output_16" in kwargs:
         output_lists_16 = kwargs["output_16"]
-    add_test_case(test_name + "Bit16", inst_names, validation_type, validation_tolerance,
-                  input_lists_16, output_lists_16, "cs_6_2", get_shader_text(shader_key.replace("int","int16_t"), shader_op_name),
-                  shader_arguments="-enable-16bit-types", **kwargs)
+    add_test_case(
+        f"{test_name}Bit16",
+        inst_names,
+        validation_type,
+        validation_tolerance,
+        input_lists_16,
+        output_lists_16,
+        "cs_6_2",
+        get_shader_text(shader_key.replace("int", "int16_t"), shader_op_name),
+        shader_arguments="-enable-16bit-types",
+        **kwargs,
+    )
 
 def add_test_case_float_half(test_name, inst_names, validation_type, validation_tolerance,
                   float_input_lists, float_output_lists, shader_key, shader_op_name, **kwargs):
@@ -102,19 +111,57 @@ def add_test_case_float_half(test_name, inst_names, validation_type, validation_
         half_validation_tolerance = kwargs["half_validation_tolerance"]
     # skip relative error test check for half for now
     if validation_type != "Relative":
-        add_test_case(test_name + "Half", inst_names, half_validation_type, half_validation_tolerance,
-                    half_input_lists, half_output_lists, "cs_6_2",
-                    get_shader_text(shader_key.replace("float","half"), shader_op_name), shader_arguments="-enable-16bit-types", **kwargs)
+        add_test_case(
+            f"{test_name}Half",
+            inst_names,
+            half_validation_type,
+            half_validation_tolerance,
+            half_input_lists,
+            half_output_lists,
+            "cs_6_2",
+            get_shader_text(
+                shader_key.replace("float", "half"), shader_op_name
+            ),
+            shader_arguments="-enable-16bit-types",
+            **kwargs,
+        )
 
 def add_test_case_denorm(test_name, inst_names, validation_type, validation_tolerance, input_lists,
                     output_lists_ftz, output_lists_preserve, shader_target, shader_text, **kwargs):
-    add_test_case(test_name + "FTZ", inst_names, validation_type, validation_tolerance, input_lists,
-                  output_lists_ftz, shader_target, shader_text, shader_arguments="-denorm ftz")
-    add_test_case(test_name + "Preserve", inst_names, validation_type, validation_tolerance, input_lists,
-                  output_lists_preserve, shader_target, shader_text, shader_arguments="-denorm preserve")
+    add_test_case(
+        f"{test_name}FTZ",
+        inst_names,
+        validation_type,
+        validation_tolerance,
+        input_lists,
+        output_lists_ftz,
+        shader_target,
+        shader_text,
+        shader_arguments="-denorm ftz",
+    )
+    add_test_case(
+        f"{test_name}Preserve",
+        inst_names,
+        validation_type,
+        validation_tolerance,
+        input_lists,
+        output_lists_preserve,
+        shader_target,
+        shader_text,
+        shader_arguments="-denorm preserve",
+    )
     # we can expect the same output for "any" and "preserve" mode. We should make sure that for validation zero are accepted outputs for denormal outputs.
-    add_test_case(test_name + "Any", inst_names, validation_type, validation_tolerance, input_lists,
-                  output_lists_preserve + output_lists_ftz, shader_target, shader_text, shader_arguments="-denorm any")
+    add_test_case(
+        f"{test_name}Any",
+        inst_names,
+        validation_type,
+        validation_tolerance,
+        input_lists,
+        output_lists_preserve + output_lists_ftz,
+        shader_target,
+        shader_text,
+        shader_arguments="-denorm any",
+    )
 
 
 g_shader_texts = {
@@ -1446,18 +1493,14 @@ def generate_parameter_types(table, num_inputs, num_outputs, has_known_warp_issu
         ET.SubElement(
             param_types,
             "ParameterType",
-            attrib={
-                "Name": 'Validation.Input{}'.format(i + 1),
-                'Array': 'true'
-            }).text = "String"
+            attrib={"Name": f'Validation.Input{i + 1}', 'Array': 'true'},
+        ).text = "String"
     for i in range(0, num_outputs):
         ET.SubElement(
             param_types,
             "ParameterType",
-            attrib={
-                "Name": 'Validation.Expected{}'.format(i + 1),
-                'Array': 'true'
-            }).text = "String"
+            attrib={"Name": f'Validation.Expected{i + 1}', 'Array': 'true'},
+        ).text = "String"
     if has_known_warp_issue:
         ET.SubElement(param_types, "ParameterType", attrib={"Name":"Warp.Version"}).text = "unsigned int"
 
@@ -1586,15 +1629,13 @@ def generate_row(table, case):
         "Name": "ShaderOp.Target"
     }).text = case.shader_target
     for i in range(len(case.input_lists)):
-        inputs = ET.SubElement(row, "Parameter", {
-            "Name": "Validation.Input{}".format(i + 1)
-        })
+        inputs = ET.SubElement(row, "Parameter", {"Name": f"Validation.Input{i + 1}"})
         for val in case.input_lists[i]:
             ET.SubElement(inputs, "Value").text = str(val)
     for i in range(len(case.output_lists)):
-        outputs = ET.SubElement(row, "Parameter", {
-            "Name": "Validation.Expected{}".format(i + 1)
-        })
+        outputs = ET.SubElement(
+            row, "Parameter", {"Name": f"Validation.Expected{i + 1}"}
+        )
         for val in case.output_lists[i]:
             ET.SubElement(outputs, "Value").text = str(val)
     # Optional parameters
@@ -1615,9 +1656,9 @@ def generate_row_wave(table, case):
         "Name": "Validation.NumInputSet"
     }).text = str(len(case.input_lists))
     for i in range(len(case.input_lists)):
-        inputs = ET.SubElement(row, "Parameter", {
-            "Name": "Validation.InputSet{}".format(i + 1)
-        })
+        inputs = ET.SubElement(
+            row, "Parameter", {"Name": f"Validation.InputSet{i + 1}"}
+        )
         for val in case.input_lists[i]:
             ET.SubElement(inputs, "Value").text = str(val)
 

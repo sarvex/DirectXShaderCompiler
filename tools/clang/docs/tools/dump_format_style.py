@@ -26,9 +26,7 @@ def doxygen2rst(text):
 def indent(text, columns):
   indent = ' ' * columns
   s = re.sub(r'\n([^\n])', '\n' + indent + '\\1', text, flags=re.S)
-  if s.startswith('\n'):
-    return s
-  return indent + s
+  return s if s.startswith('\n') else indent + s
 
 class Option:
   def __init__(self, name, type, comment):
@@ -68,6 +66,7 @@ def clean_comment_line(line):
   return line[3:].strip() + '\n'
 
 def read_options(header):
+
   class State:
     BeforeStruct, Finished, InStruct, InFieldComment, InEnum, \
     InEnumMemberComment = range(6)
@@ -123,12 +122,17 @@ def read_options(header):
     raise Exception('Not finished by the end of file')
 
   for option in options:
-    if not option.type in ['bool', 'unsigned', 'int', 'std::string',
-                           'std::vector<std::string>']:
+    if option.type not in [
+        'bool',
+        'unsigned',
+        'int',
+        'std::string',
+        'std::vector<std::string>',
+    ]:
       if enums.has_key(option.type):
         option.enum = enums[option.type]
       else:
-        raise Exception('Unknown type: %s' % option.type)
+        raise Exception(f'Unknown type: {option.type}')
   return options
 
 options = read_options(open(FORMAT_STYLE_FILE))

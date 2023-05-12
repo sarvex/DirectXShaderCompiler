@@ -28,44 +28,38 @@ def VerifyIncludes(filename, lines):
 
   DISALLOWED_SYSTEM_HEADERS = ['iostream']
 
-  line_num = 1
   prev_config_header = None
   prev_system_header = None
-  for line in lines:
-    # TODO: implement private headers
-    # TODO: implement gtest headers
-    # TODO: implement top-level llvm/* headers
-    # TODO: implement llvm/Support/* headers
+  for line_num, line in enumerate(lines, start=1):
+    if config_header := include_config_re.match(line):
+      curr_config_header = config_header[1]
+      if prev_config_header and prev_config_header > curr_config_header:
+        lint.append((
+            filename,
+            line_num,
+            f'Config headers not in order: "{prev_config_header}" before "{curr_config_header}"',
+        ))
 
-    # Process Config/* headers
-    config_header = include_config_re.match(line)
-    if config_header:
-      curr_config_header = config_header.group(1)
-      if prev_config_header:
-        if prev_config_header > curr_config_header:
-          lint.append((filename, line_num,
-                       'Config headers not in order: "%s" before "%s"' % (
-                         prev_config_header, curr_config_header)))
-
-    # Process system headers
-    system_header = include_system_re.match(line)
-    if system_header:
-      curr_system_header = system_header.group(1)
+    if system_header := include_system_re.match(line):
+      curr_system_header = system_header[1]
 
       # Is it blacklisted?
       if curr_system_header in DISALLOWED_SYSTEM_HEADERS:
-        lint.append((filename, line_num,
-                     'Disallowed system header: <%s>' % curr_system_header))
+        lint.append((
+            filename,
+            line_num,
+            f'Disallowed system header: <{curr_system_header}>',
+        ))
       elif prev_system_header:
         # Make sure system headers are alphabetized amongst themselves
         if prev_system_header > curr_system_header:
-          lint.append((filename, line_num,
-                       'System headers not in order: <%s> before <%s>' % (
-                         prev_system_header, curr_system_header)))
+          lint.append((
+              filename,
+              line_num,
+              f'System headers not in order: <{prev_system_header}> before <{curr_system_header}>',
+          ))
 
       prev_system_header = curr_system_header
-
-    line_num += 1
 
   return lint
 

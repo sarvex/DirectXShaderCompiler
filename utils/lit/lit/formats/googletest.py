@@ -65,8 +65,7 @@ class GoogleTest(TestFormat):
             ln = ln[index*2:]
             if ln.endswith('.'):
                 nested_tests.append(ln)
-            elif any([name.startswith('DISABLED_')
-                      for name in nested_tests + [ln]]):
+            elif any(name.startswith('DISABLED_') for name in nested_tests + [ln]):
                 # Gtest will internally skip these tests. No need to launch a
                 # child process for it.
                 continue
@@ -91,20 +90,22 @@ class GoogleTest(TestFormat):
             filepath = os.path.join(source_path, filename)
             if os.path.isdir(filepath):
                 # Iterate over executables in a directory.
-                if not os.path.normcase(filename) in self.test_sub_dir:
+                if os.path.normcase(filename) not in self.test_sub_dir:
                     continue
                 dirpath_in_suite = path_in_suite + (filename, )
                 for subfilename in os.listdir(filepath):
                     execpath = os.path.join(filepath, subfilename)
-                    for test in self.getTestsInExecutable(
-                            testSuite, dirpath_in_suite, execpath,
-                            litConfig, localConfig):
-                      yield test
+                    yield from self.getTestsInExecutable(
+                        testSuite,
+                        dirpath_in_suite,
+                        execpath,
+                        litConfig,
+                        localConfig,
+                    )
             elif ('.' in self.test_sub_dir):
-                for test in self.getTestsInExecutable(
-                        testSuite, path_in_suite, filepath,
-                        litConfig, localConfig):
-                    yield test
+                yield from self.getTestsInExecutable(
+                    testSuite, path_in_suite, filepath, litConfig, localConfig
+                )
 
     def execute(self, test, litConfig):
         testPath,testName = os.path.split(test.getSourcePath())
@@ -112,9 +113,9 @@ class GoogleTest(TestFormat):
             # Handle GTest parametrized and typed tests, whose name includes
             # some '/'s.
             testPath, namePrefix = os.path.split(testPath)
-            testName = namePrefix + '/' + testName
+            testName = f'{namePrefix}/{testName}'
 
-        cmd = [testPath, '--gtest_filter=' + testName]
+        cmd = [testPath, f'--gtest_filter={testName}']
         if litConfig.useValgrind:
             cmd = litConfig.valgrindArgs + cmd
 

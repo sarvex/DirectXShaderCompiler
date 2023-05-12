@@ -95,7 +95,7 @@ def find_executable(executable, path=None):
         # executable files on OS/2 can have an arbitrary extension, but
         # .exe is automatically appended if no dot is present in the name
         if not ext:
-            executable = executable + ".exe"
+            executable = f"{executable}.exe"
     elif sys.platform == 'win32':
         pathext = os.environ['PATHEXT'].lower().split(os.pathsep)
         (base, ext) = os.path.splitext(executable)
@@ -105,11 +105,10 @@ def find_executable(executable, path=None):
         execname = executable + ext
         if os.path.isfile(execname):
             return execname
-        else:
-            for p in paths:
-                f = os.path.join(p, execname)
-                if os.path.isfile(f):
-                    return f
+        for p in paths:
+            f = os.path.join(p, execname)
+            if os.path.isfile(f):
+                return f
     else:
         return None
 
@@ -159,16 +158,15 @@ def check_options(parser, options, valid_builds):
     # See if we're building valid flavors.
     for build in options.build:
         if (build not in valid_builds):
-            parser.error("'" + build + "' is not a valid build flavor "
-                         + str(valid_builds))
+            parser.error(f"'{build}' is not a valid build flavor {str(valid_builds)}")
 
     # See if we can find source directories.
     for src in options.src:
         for component in components:
             component = component.rstrip("2")
-            compsrc = src + "/" + component
+            compsrc = f"{src}/{component}"
             if (not os.path.isdir(compsrc)):
-                parser.error("'" + compsrc + "' does not exist")
+                parser.error(f"'{compsrc}' does not exist")
 
     # See if we can find the compilers
     options.cc = find_executable(options.cc)
@@ -185,13 +183,12 @@ def get_path_abbrevs(paths):
     unique_paths = list(paths)
 
     class NotFoundException(Exception): pass
-
     # Find a unique component of each path.
     unique_bases = unique_paths[:]
     found = 0
-    while len(unique_paths) > 0:
+    while unique_paths:
         bases = [os.path.basename(src) for src in unique_paths]
-        components = { c for c in bases }
+        components = set(bases)
         # Account for single entry in paths.
         if len(components) > 1 or len(components) == len(bases):
             # We found something unique.
@@ -205,12 +202,10 @@ def get_path_abbrevs(paths):
             unique_paths = [ p for p in unique_paths if p is not None ]
         unique_paths = [os.path.dirname(src) for src in unique_paths]
 
-    if len(unique_paths) > 0:
+    if unique_paths:
         raise NotFoundException()
 
-    abbrevs = dict(zip(paths, [base for base in unique_bases]))
-
-    return abbrevs
+    return dict(zip(paths, list(unique_bases)))
 
 # Given a set of unique names, find a short character sequence that
 # uniquely identifies them.
@@ -219,9 +214,8 @@ def get_short_abbrevs(unique_bases):
     my_unique_bases = unique_bases[:]
     unique_char_starts = unique_bases[:]
     while len(my_unique_bases) > 0:
-        for start, char_tuple in enumerate(zip(*[base
-                                                 for base in my_unique_bases])):
-            chars = { c for c in char_tuple }
+        for start, char_tuple in enumerate(zip(*list(my_unique_bases))):
+            chars = set(char_tuple)
             # Account for single path.
             if len(chars) > 1 or len(chars) == len(char_tuple):
                 # We found something unique.
@@ -239,10 +233,12 @@ def get_short_abbrevs(unique_bases):
     if len(my_unique_bases) > 0:
         raise NotFoundException()
 
-    abbrevs = [abbrev[start_index:start_index+3]
-               for abbrev, start_index
-               in zip([base for base in unique_bases],
-                      [index for index in unique_char_starts])]
+    abbrevs = [
+        abbrev[start_index : start_index + 3]
+        for abbrev, start_index in zip(
+            list(unique_bases), list(unique_char_starts)
+        )
+    ]
 
     abbrevs = dict(zip(unique_bases, abbrevs))
 
@@ -289,8 +285,7 @@ class Builder(threading.Thread):
         for key, value in env.items():
             execenv[key] = value
 
-        self.logger.debug("[" + prefix + "] " + "env " + str(env) + " "
-                          + " ".join(command));
+        self.logger.debug((f"[{prefix}] env {str(env)} " + " ".join(command)));
 
         try:
             proc = subprocess.Popen(command,
@@ -299,17 +294,10 @@ class Builder(threading.Thread):
                                     stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT)
 
-            line = proc.stdout.readline()
-            while line:
-                self.logger.info("[" + prefix + "] "
-                                 + str(line, "utf-8").rstrip())
-                line = proc.stdout.readline()
-
+            while line := proc.stdout.readline():
+                self.logger.info(f"[{prefix}] " + str(line, "utf-8").rstrip())
             (stdoutdata, stderrdata) = proc.communicate()
-            retcode = proc.wait()
-
-            return retcode
-
+            return proc.wait()
         except:
             traceback.print_exc()
 
@@ -326,8 +314,7 @@ class Builder(threading.Thread):
                                     stderr=subprocess.STDOUT)
 
             gather = False
-            line = proc.stdout.readline()
-            while line:
+            while line := proc.stdout.readline():
                 self.logger.debug(line)
                 if re.search("End of search list", str(line)) is not None:
                     self.logger.debug("Stop Gather")
@@ -337,8 +324,6 @@ class Builder(threading.Thread):
                 if re.search("#include <...> search starts", str(line)) is not None:
                     self.logger.debug("Start Gather")
                     gather = True
-                line = proc.stdout.readline()
-
         except:
             traceback.print_exc()
         self.logger.debug(includes)

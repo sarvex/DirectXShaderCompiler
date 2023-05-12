@@ -6,10 +6,10 @@
 # Simplifies some calculations
 class Aleph0(int):
     _singleton = None
-    def __new__(type):
-        if type._singleton is None:
-            type._singleton = int.__new__(type)
-        return type._singleton
+    def __new__(cls):
+        if cls._singleton is None:
+            cls._singleton = int.__new__(cls)
+        return cls._singleton
     def __repr__(self): return '<aleph0>'
     def __str__(self): return 'inf'
     
@@ -25,8 +25,7 @@ class Aleph0(int):
     __radd__ = __add__
 
     def __mul__(self, b): 
-        if b == 0: return b            
-        return self
+        return b if b == 0 else self
     __rmul__ = __mul__
 
     def __floordiv__(self, b):
@@ -39,8 +38,7 @@ class Aleph0(int):
     __rdiv__ = __floordiv__
 
     def __pow__(self, b):
-        if b == 0: return 1
-        return self
+        return 1 if b == 0 else self
 aleph0 = Aleph0()
 
 def base(line):
@@ -101,29 +99,28 @@ def getNthPairBounded(N,W=aleph0,H=aleph0,useDivmod=False):
 
     if useDivmod:
         return N%W,N//W
-    else:
-        # Conceptually we want to slide a diagonal line across a
-        # rectangle. This gives more interesting results for large
-        # bounds than using divmod.
-        
-        # If in lower left, just return as usual
-        cornerSize = base(W)
-        if N < cornerSize:
-            return getNthPair(N)
+    # Conceptually we want to slide a diagonal line across a
+    # rectangle. This gives more interesting results for large
+    # bounds than using divmod.
 
-        # Otherwise if in upper right, subtract from corner
-        if H is not aleph0:
-            M = W*H - N - 1
-            if M < cornerSize:
-                x,y = getNthPair(M)
-                return (W-1-x,H-1-y)
+    # If in lower left, just return as usual
+    cornerSize = base(W)
+    if N < cornerSize:
+        return getNthPair(N)
 
-        # Otherwise, compile line and index from number of times we
-        # wrap.
-        N = N - cornerSize
-        index,offset = N%W,N//W
-        # p = (W-1, 1+offset) + (-1,1)*index
-        return (W-1-index, 1+offset+index)
+    # Otherwise if in upper right, subtract from corner
+    if H is not aleph0:
+        M = W*H - N - 1
+        if M < cornerSize:
+            x,y = getNthPair(M)
+            return (W-1-x,H-1-y)
+
+    # Otherwise, compile line and index from number of times we
+    # wrap.
+    N = N - cornerSize
+    index,offset = N%W,N//W
+    # p = (W-1, 1+offset) + (-1,1)*index
+    return (W-1-index, 1+offset+index)
 def getNthPairBoundedChecked(N,W=aleph0,H=aleph0,useDivmod=False,GNP=getNthPairBounded):
     x,y = GNP(N,W,H,useDivmod)
     assert 0 <= x < W and 0 <= y < H
@@ -204,10 +201,7 @@ def getNthPairVariableBounds(N, bounds):
     for i,index in enumerate(active):
         level = bounds[index]
         W = len(active) - i
-        if level is aleph0:
-            H = aleph0
-        else:
-            H = level - prevLevel
+        H = aleph0 if level is aleph0 else level - prevLevel
         levelSize = W*H
         if N<levelSize: # Found the level
             idelta,delta = getNthPairBounded(N, W, H)
@@ -263,12 +257,6 @@ def testPairsVB():
 ###
 
 # Toggle to use checked versions of enumeration routines.
-if False:
-    getNthPairVariableBounds = getNthPairVariableBoundsChecked
-    getNthPairBounded = getNthPairBoundedChecked
-    getNthNTuple = getNthNTupleChecked
-    getNthTuple = getNthTupleChecked
-
 if __name__ == '__main__':
     testPairs()
 

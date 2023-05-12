@@ -35,9 +35,8 @@ class DeltaAlgorithm(object):
         # the user doesn't expect monotonicity, and we may end up
         # doing O(N^2) tests, or (b) the test is wrong. Avoid the
         # O(N^2) case unless user requests it.
-        if not force:
-            if not self.getTestResult(changes):
-                raise ValueError,'Initial test passed to delta fails.'
+        if not force and not self.getTestResult(changes):
+            raise ValueError,'Initial test passed to delta fails.'
 
         # Check empty set first to quickly find poor test functions.
         if self.getTestResult(set()):
@@ -55,10 +54,7 @@ class DeltaAlgorithm(object):
         # context information (but then the API becomes grosser).
         L = list(S)
         mid = len(L)//2
-        if mid==0:
-            return L,
-        else:
-            return L[:mid],L[mid:]
+        return (L, ) if mid==0 else (L[:mid], L[mid:])
     
     def delta(self, c, sets):
         # assert(reduce(set.union, sets, set()) == c)
@@ -66,7 +62,7 @@ class DeltaAlgorithm(object):
         # If there is nothing left we can remove, we are done.
         if len(sets) <= 1:
             return c
-        
+
         # Look for a passing subset.
         res = self.search(c, sets)
         if res is not None:
@@ -74,10 +70,7 @@ class DeltaAlgorithm(object):
 
         # Otherwise, partition sets if possible; if not we are done.
         refined = sum(map(list, map(self.split, sets)), [])
-        if len(refined) == len(sets):
-            return c
-        
-        return self.delta(c, refined)
+        return c if len(refined) == len(sets) else self.delta(c, refined)
 
     def search(self, c, sets):
         for i,S in enumerate(sets):
@@ -118,10 +111,7 @@ def getTokens(path):
     for ln in err.split('\n'):
         # Silly programmers refuse to print in simple machine readable
         # formats. Whatever.
-        if collect is None:
-            collect = ln
-        else:
-            collect = collect + '\n' + ln
+        collect = ln if collect is None else collect + '\n' + ln
         if 'Loc=<' in ln and ln.endswith('>'):
             ln,collect = collect,None
             tokens.append(Token(*kTokenRE.match(ln).groups()))
@@ -134,7 +124,8 @@ class TMBDDelta(DeltaAlgorithm):
     def __init__(self, testProgram, tokenLists, log):
         def patchName(name, suffix):
             base,ext = os.path.splitext(name)
-            return base + '.' + suffix + ext
+            return f'{base}.{suffix}{ext}'
+
         super(TMBDDelta, self).__init__()
         self.testProgram = testProgram
         self.tokenLists = tokenLists
@@ -147,16 +138,14 @@ class TMBDDelta(DeltaAlgorithm):
 
     def writeFiles(self, changes, fileNames):
         assert len(fileNames) == len(self.tokenLists)
-        byFile = [[] for i in self.tokenLists]
+        byFile = [[] for _ in self.tokenLists]
         for i,j in changes:
             byFile[i].append(j)
 
         for i,(file,tokens) in enumerate(self.tokenLists):
-            f = open(fileNames[i],'w')
-            for j in byFile[i]:
-                f.write(tokens[j])
-            f.close()
-
+            with open(fileNames[i],'w') as f:
+                for j in byFile[i]:
+                    f.write(tokens[j])
         return byFile
 
     def test(self, changes):

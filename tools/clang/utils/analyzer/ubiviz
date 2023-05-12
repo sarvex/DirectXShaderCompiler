@@ -20,10 +20,9 @@ def Error(message):
     sys.exit(1)
     
 def StreamData(filename):
-  file = open(filename)
-  for ln in file:
-    yield eval(ln)
-  file.close()
+    with open(filename) as file:
+        for ln in file:
+          yield eval(ln)
 
 def Display(G, data):
   action = data[0]

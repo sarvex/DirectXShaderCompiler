@@ -90,25 +90,27 @@ def CopyFiles(source_path, dest_path, filenames, symbols=False):
         renamed = filename
         try:
             filename, renamed = filename.split(';')
-            print('Copying %s from %s to %s' % (filename, source_path, dest_path))
-            print('.. with new name: %s' % (renamed))
+            print(f'Copying {filename} from {source_path} to {dest_path}')
+            print(f'.. with new name: {renamed}')
         except:
-            print('Copying %s from %s to %s' % (filename, source_path, dest_path))
+            print(f'Copying {filename} from {source_path} to {dest_path}')
         try:
             shutil.copy2(os.path.join(source_path, filename), os.path.join(dest_path, renamed))
         except:
-            print('Error copying "%s" from "%s" to "%s"' % (filename, source_path, dest_path))
+            print(f'Error copying "{filename}" from "{source_path}" to "{dest_path}"')
             # sys.excepthook(*sys.exc_info())
             continue
         if symbols and (filename.endswith('.exe') or filename.endswith('.dll')):
-            symbol_filename = filename[:-4] + '.pdb'
+            symbol_filename = f'{filename[:-4]}.pdb'
             try:
                 shutil.copy2(os.path.join(source_path, symbol_filename), os.path.join(dest_path, symbol_filename))
             except:
-                print('Error copying symbols "%s" from "%s" to "%s"' % (symbol_filename, source_path, dest_path))
+                print(
+                    f'Error copying symbols "{symbol_filename}" from "{source_path}" to "{dest_path}"'
+                )
 def CopyBins(args, name, dxil, filenames, symbols=False):
     samples_path = args.samples
-    config = dxil and 'DxilDebug' or 'Debug'
+    config = 'DxilDebug' if dxil else 'Debug'
     CopyFiles(args.bins, os.path.join(PathToSampleSrc(samples_path, name), 'bin', args.arch, config), filenames, symbols)
 def ActionCopyCompilerBins(args, name, dxil):
     if dxil:
@@ -138,10 +140,7 @@ def MakeD3D12WarpCopy(bin_path):
 
 def PathSplitAll(p):
     s = filter(None, os.path.split(p))
-    if len(s) > 1:
-        return PathSplitAll(s[0]) + (s[1],)
-    else:
-        return (s[0],)
+    return PathSplitAll(s[0]) + (s[1],) if len(s) > 1 else (s[0], )
 
 def GetBinPath(args, name):
     return os.path.join(args.bins, name)
@@ -169,11 +168,11 @@ def CheckEnvironment(args):
         print("The -bins argument is needed to populate tool binaries.")
         exit(1)
     if not os.path.exists(args.bins):
-        print("The -bins argument '" + args.bins + "' does not exist.")
+        print(f"The -bins argument '{args.bins}' does not exist.")
         exit(1)
     for fn in ListRuntimeCompilePaths(args):
         if not os.path.exists(fn):
-            print("Expected file '" + fn + "' not found.")
+            print(f"Expected file '{fn}' not found.")
             exit(1)
     if os.path.getmtime(GetBinPath(args, 'fxc.exe')) != os.path.getmtime(GetBinPath(args, 'dxc.exe')):
         print("fxc.exe should be a copy of dxc.exe.")
@@ -181,9 +180,9 @@ def CheckEnvironment(args):
         exit(1)
     try:
         msbuild_version = subprocess.check_output(["msbuild", "-nologo", "-ver"])
-        print("msbuild version: " + msbuild_version)
+        print(f"msbuild version: {msbuild_version}")
     except Exception as E:
-        print("Unable to get the version from msbuild: " + str(E))
+        print(f"Unable to get the version from msbuild: {str(E)}")
         print("This command should be run from a Developer Command Prompt")
         exit(1)
 
@@ -207,8 +206,15 @@ def AddProjectConfigs(root, args):
     # Override fxc path for Dxil configs:
     for config in ['DxilDebug', 'DxilRelease']:
         for arch in ['Win32', 'x64']:
-            if not root.find('''./PropertyGroup[@Condition="'$(Configuration)|$(Platform)'=='%s|%s'"]/FXCToolPath''' % (config, arch)):
-                e = ET.Element('PropertyGroup', {'Condition': "'$(Configuration)|$(Platform)'=='%s|%s'" % (config, arch)})
+            if not root.find(
+                f'''./PropertyGroup[@Condition="'$(Configuration)|$(Platform)'=='{config}|{arch}'"]/FXCToolPath'''
+            ):
+                e = ET.Element(
+                    'PropertyGroup',
+                    {
+                        'Condition': f"'$(Configuration)|$(Platform)'=='{config}|{arch}'"
+                    },
+                )
                 e.text = '\n    '
                 e.tail = '\n  '
                 root.insert(0, e)
@@ -221,17 +227,18 @@ def AddProjectConfigs(root, args):
     configs = {}
     for e in ig:
         try:
-            m = rxConfig.match(e.attrib['Include'])
-            if m:
+            if m := rxConfig.match(e.attrib['Include']):
                 key = m.groups()
                 configs[key] = e
-                if m.group(1) == 'Debug':
+                if m[1] == 'Debug':
                     debug_config = key, e
-                elif m.group(1) == 'Release':
+                elif m[1] == 'Release':
                     release_config = key, e
         except:
             continue
-    parents = root.findall('''.//*[@Condition="'$(Configuration)|$(Platform)'=='%s|%s'"]/..''' % ('Debug', 'x64'))
+    parents = root.findall(
+        """.//*[@Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"]/.."""
+    )
     if not configs or not debug_config or not release_config:
         print('No ProjectConfigurations found')
         return False
@@ -241,17 +248,17 @@ def AddProjectConfigs(root, args):
                 t_config = 'Debug', 'x64'
             else:
                 t_config = 'Release', 'x64'
-            config_condition = "'$(Configuration)|$(Platform)'=='%s|%s'" % t_config
             if not configs.get((config, arch), None):
                 changed = True
                 if config in ('Debug', 'DxilDebug'):
                     e = DeepCopyElement(debug_config[1])
                 else:
                     e = DeepCopyElement(release_config[1])
-                e.set('Include', '%s|%s' % (config, arch))
+                e.set('Include', f'{config}|{arch}')
                 e.find('./Configuration').text = config
                 e.find('./Platform').text = arch
                 ig.append(e)
+                config_condition = "'$(Configuration)|$(Platform)'=='%s|%s'" % t_config
                 for parent in reversed(parents):
                     for n, e in reversed(list(enumerate(parent))):
                         try:
@@ -265,7 +272,7 @@ def AddProjectConfigs(root, args):
                                 FxCompile = e.find('./FxCompile') or ET.SubElement(e, 'FxCompile')
                                 DisableOptimizations = FxCompile.find('./DisableOptimizations') or ET.SubElement(FxCompile, 'DisableOptimizations')
                                 DisableOptimizations.text = 'false'
-                            e.attrib['Condition'] = "'$(Configuration)|$(Platform)'=='%s|%s'" % (config, arch)
+                            e.attrib['Condition'] = f"'$(Configuration)|$(Platform)'=='{config}|{arch}'"
                             parent.insert(n+1, e)
     return changed
 
@@ -281,6 +288,7 @@ def AddSlnConfigs(sln_text):
         "Prevent duplicates from being added"
         if line not in line_set:
             lst.append(line)
+
     for line in sln_text.splitlines():
         if line == 'VisualStudioVersion = 14.0.23107.0':
             sln_changed.append('VisualStudioVersion = 14.0.25123.0')
@@ -292,11 +300,16 @@ def AddSlnConfigs(sln_text):
             m = rxBuild.match(line)
         if m:
             sln_changed.append(line)
-            config = m.group(1)
-            if config in ('Debug', 'Release') and m.group(2) == 'x64':
+            config = m[1]
+            if config in ('Debug', 'Release') and m[2] == 'x64':
                 add_line(sln_changed, line.replace('x64', 'Win32'))
-                add_line(sln_changed, line.replace(config, 'Dxil' + config))
-                add_line(sln_changed, line.replace(config, 'Dxil' + config).replace('x64', 'Win32'))
+                add_line(sln_changed, line.replace(config, f'Dxil{config}'))
+                add_line(
+                    sln_changed,
+                    line.replace(config, f'Dxil{config}').replace(
+                        'x64', 'Win32'
+                    ),
+                )
             continue
         sln_changed.append(line)
     return '\n'.join(sln_changed)
@@ -304,7 +317,7 @@ def AddSlnConfigs(sln_text):
 def PatchProjects(args):
     for name in sample_names + ['D3D12HelloWorld']:
         sample_path = PathToSampleSrc(args.samples, name)
-        print("Patching " + name + " in " + sample_path)
+        print(f"Patching {name} in {sample_path}")
         for proj_path in glob.glob(os.path.join(sample_path, "*.vcxproj")):
             # Consider looking for msbuild and other tool paths in registry, etg:
             # reg query HKLM\Software\Microsoft\MSBuild\ToolsVersions\14.0
@@ -313,7 +326,7 @@ def PatchProjects(args):
             root = ReadXmlString(proj_text)
             if AddProjectConfigs(root, args):
                 changed_text = WriteXmlString(root)
-                print("Patching the Windows SDK version in " + proj_path)
+                print(f"Patching the Windows SDK version in {proj_path}")
                 with open (proj_path, "w") as proj_file:
                     proj_file.write(changed_text)
 
@@ -323,20 +336,25 @@ def PatchProjects(args):
                 sln_text = sln_file.read()
             changed_text = AddSlnConfigs(sln_text)
             if changed_text != sln_text:
-                print("Adding additional configurations to " + sln_path)
+                print(f"Adding additional configurations to {sln_path}")
                 with open (sln_path, "w") as sln_file:
                     sln_file.write(changed_text)
 
 def BuildSample(samples_path, name, x86, dxil):
     sample_path = PathToSampleSrc(samples_path, name)
     if not SampleIsNested(name):
-        print("Building " + name + " in " + sample_path)
-        Platform = x86 and 'Win32' or 'x64'
-        Configuration = dxil and 'DxilDebug' or 'Debug'
-        subprocess.check_call(["msbuild", "-nologo", 
-            '/p:Configuration=%s;Platform=%s' % (Configuration, Platform), 
-            '/t:Rebuild'], 
-            cwd=sample_path)
+        print(f"Building {name} in {sample_path}")
+        Platform = 'Win32' if x86 else 'x64'
+        Configuration = 'DxilDebug' if dxil else 'Debug'
+        subprocess.check_call(
+            [
+                "msbuild",
+                "-nologo",
+                f'/p:Configuration={Configuration};Platform={Platform}',
+                '/t:Rebuild',
+            ],
+            cwd=sample_path,
+        )
 
 def BuildSamples(args, dxil):
     samples_path = args.samples
@@ -360,10 +378,9 @@ def PatchSample(args, name, dxil, afterBuild):
     try:
         sample = samples[name]
     except:
-        print("Error: selected sample missing from sample map '" + name + "'.")
+        print(f"Error: selected sample missing from sample map '{name}'.")
         return
-    if afterBuild:  actions = sample.postBuild
-    else:           actions = sample.preBuild
+    actions = sample.postBuild if afterBuild else sample.preBuild
     for action in actions:
         action(args, name, dxil)
 
@@ -402,11 +419,7 @@ if __name__ == "__main__":
 
     SetSampleActions()
 
-    if args.x86:
-        args.arch = "Win32"
-    else:
-        args.arch = "x64"
-
+    args.arch = "Win32" if args.x86 else "x64"
     if not args.samples:
         print("The -samples option must be used to indicate the root of D3D12 Samples.")
         print("Samples are available at this URL.")
@@ -414,12 +427,12 @@ if __name__ == "__main__":
         exit(1)
 
     if args.sample:
-        print('Applying sample filter: %s' % args.sample)
+        print(f'Applying sample filter: {args.sample}')
         args.sample = re.escape(args.sample).replace('\\*', '.*')
         rxSample = re.compile(args.sample, re.I)
         for name in samples:
             if rxSample.match(name):
-                print('  %s' % name)
+                print(f'  {name}')
 
     if args.postbuild:
         print("Applying patch to post-build binaries to enable dxc ...")

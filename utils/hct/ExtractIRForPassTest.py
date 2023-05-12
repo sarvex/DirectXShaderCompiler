@@ -47,7 +47,7 @@ def ParseArgs():
   return parser.parse_args()
 
 def SplitAtPass(passes, pass_name, invocation = 1):
-  pass_name = '-' + pass_name
+  pass_name = f'-{pass_name}'
   before = []
   fn_passes = True
   count = 0
@@ -61,12 +61,11 @@ def SplitAtPass(passes, pass_name, invocation = 1):
     if after:
       after.append(line)
       continue
-    if not fn_passes:
-      if line == pass_name:
-        count += 1
-        if count >= invocation:
-          after = [line]
-          continue
+    if not fn_passes and line == pass_name:
+      count += 1
+      if count >= invocation:
+        after = [line]
+        continue
     before.append(line)
   return before, after
 
@@ -95,13 +94,14 @@ def main(args):
     #    -hlsl-passes-pause to write correct metadata
     passes_before, passes_after = SplitAtPass(
       all_passes, args.desired_pass, args.invocation)
-    print('\nPasses before: {}\n\nRemaining passes: {}'
-            .format(' '.join(passes_before), ' '.join(passes_after)))
+    print(
+        f"\nPasses before: {' '.join(passes_before)}\n\nRemaining passes: {' '.join(passes_after)}"
+    )
     passes_before.append('-hlsl-passes-pause')
 
     # 4. Invokes dxopt to run passes on -fcgl output and write bitcode result
     bitcode_file = GetTempFilename('.bc')
-    cmd = ['dxopt', '-o=' + bitcode_file, fcgl_file] + passes_before
+    cmd = ['dxopt', f'-o={bitcode_file}', fcgl_file] + passes_before
     # print(cmd)
     subprocess.check_call(cmd)
 
@@ -113,8 +113,9 @@ def main(args):
 
     # 6. Inserts RUN line with -hlsl-passes-resume and desired pass
     with open(args.output_file, 'wt') as f:
-      f.write('; RUN: %opt %s -hlsl-passes-resume {} -S | FileCheck %s\n\n'
-                .format(args.desired_pass))
+      f.write(
+          f'; RUN: %opt %s -hlsl-passes-resume {args.desired_pass} -S | FileCheck %s\n\n'
+      )
       with open(temp_out, 'rt') as f_in:
         f.write(f_in.read())
 
@@ -129,4 +130,4 @@ def main(args):
 if __name__=='__main__':
   args = ParseArgs()
   main(args)
-  print('\nSuccess!  See output file:\n{}'.format(args.output_file))
+  print(f'\nSuccess!  See output file:\n{args.output_file}')

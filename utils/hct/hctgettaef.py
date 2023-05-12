@@ -14,15 +14,16 @@ if not os.path.isdir(taef_dir):
 try:
   ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
   response = urllib.request.urlopen(url, context=ctx)
-  f = open(zipfile_name, 'wb')
-  f.write(response.read())
-  f.close()
+  with open(zipfile_name, 'wb') as f:
+    f.write(response.read())
 except:
   print("Unable to read file with urllib, trying via powershell...")
   from subprocess import check_call
-  cmd = ""
-  cmd += "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;"
-  cmd += "(new-object System.Net.WebClient).DownloadFile('" + url + "', '" + zipfile_name + "')"
+  cmd = (
+      "" +
+      "[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12;"
+  )
+  cmd += f"(new-object System.Net.WebClient).DownloadFile('{url}', '{zipfile_name}')"
   check_call(['powershell.exe', '-Command', cmd])
 
 z = zipfile.ZipFile(zipfile_name)

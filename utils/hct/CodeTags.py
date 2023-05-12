@@ -47,13 +47,13 @@ def SelectTaggedLines(tag, start, doc=None):
     "Select lines between tag:BEGIN and tag:END"
     if doc is None: doc = app.current_doc
     text = doc.text
-    begin = text.find(tag+':BEGIN', doc.get_selection_range()[1])
+    begin = text.find(f'{tag}:BEGIN', doc.get_selection_range()[1])
     if begin == -1:
-        raise StandardError('Could not find tag %s:BEGIN' % tag)
+        raise StandardError(f'Could not find tag {tag}:BEGIN')
     begin = text.find(native_endl, begin)
-    end = text.find(tag+':END', begin)
+    end = text.find(f'{tag}:END', begin)
     if end == -1:
-        raise StandardError('Could not find tag %s:END' % tag)
+        raise StandardError(f'Could not find tag {tag}:END')
     end = text.rfind(native_endl, begin, end) + len(native_endl)
     doc.select(begin, end)
 
@@ -64,10 +64,7 @@ def GetIndent(text, pos):
     begin = text.rfind(native_endl, 0, end)
     if begin == -1: begin = 0
     else: begin += len(native_endl)
-    m = rxWhitespace.match(text, begin, end)
-    if m:
-        return m.group(0)
-    return ''
+    return m.group(0) if (m := rxWhitespace.match(text, begin, end)) else ''
 
 def ReplaceTaggedLines(text_or_lines, tag='GENERATED_CODE', doc=None, tagrange=None):
     "Replace lines between tag:BEGIN and tag:END with text_or_lines, start searching forward from selection or end of tagrange"
@@ -87,9 +84,8 @@ def ReplaceTaggedLines(text_or_lines, tag='GENERATED_CODE', doc=None, tagrange=N
 def StripIndent(lines, indent):
     "Remove indent from lines of text"
     def strip_indent(line):
-        if line.startswith(indent):
-            return line[len(indent):]
-        return line
+        return line[len(indent):] if line.startswith(indent) else line
+
     if isinstance(lines, basestring):
         lines = lines.splitlines()
     return map(strip_indent, lines)
@@ -129,7 +125,8 @@ def _make_transform_lines(tag):
     return _transform
 def _make_output(arg):
     def _print_fn(expression_text, doc=app.current_doc):
-        print('%s = %s' % (expression_text, arg))
+        print(f'{expression_text} = {arg}')
+
     return _print_fn
 def _make_eval(arg):
     def _eval(expression_text, doc=app.current_doc):
@@ -150,18 +147,17 @@ def FindPyTag(doc, begin=0):
     while begin != -1:
         begin = text.find('<py', begin)
         if begin != -1:
-            m = rxPyTag.match(text, begin)
-            if m:
+            if m := rxPyTag.match(text, begin):
                 end = m.end()
                 tag_code = tag = m.group(2)
                 if tag:
                     try:
                         _operation_function_ = PyOperations[tag]
                     except KeyError:
-                        print('Unknown tag "%s"' % tag)
+                        print(f'Unknown tag "{tag}"')
                         raise
                     if m.group(3):
-                        tag_code = '(_operation_function_)%s' % m.group(3)
+                        tag_code = f'(_operation_function_){m.group(3)}'
                         try:
                             _operation_function_ = eval(tag_code, globals(), {'_operation_function_': _operation_function_})
                         except:
@@ -225,7 +221,7 @@ class Test(object):
         pass
     class TestDoc(object):
         def __repr__(self):
-            return '<TestDoc: %s=%s, %s>' % (repr(self._selection), repr(self.text[self._selection[0]:self._selection[1]]), repr(self.text))
+            return f'<TestDoc: {repr(self._selection)}={repr(self.text[self._selection[0]:self._selection[1]])}, {repr(self.text)}>'
         def __init__(self, text, selection=None):
             self.name = 'TestDoc'
             self.text = text
@@ -279,9 +275,7 @@ class Test(object):
         return str(text).replace(native_endl, '\n').replace('\r', '\n')
     @staticmethod
     def TerminateTextForVS(text):
-        if text.endswith(native_endl):
-            return text
-        return text + native_endl
+        return text if text.endswith(native_endl) else text + native_endl
     @staticmethod
     def WrapFunctionForExceptionHandling(fn):
         import sys
@@ -355,8 +349,7 @@ def test_module(tests = _tests):
     for before, expected in tests:
         test = Test(before, expected)
         test.test()
-        result = test.verify()
-        if result:
+        if result := test.verify():
             print(result)
             failed += 1
     if failed:
@@ -373,13 +366,14 @@ def _TraceFunctions():
             global _tablevel
             _tablevel += 1
             _args = map(repr, args)
-            _args += ['%s=%s' % (key, repr(value)) for key, value in kwargs.items()]
-            print('%s%s(%s)' % (_tablevel*'  ', fn.__name__, ', '.join(_args)))
+            _args += [f'{key}={repr(value)}' for key, value in kwargs.items()]
+            print(f"{_tablevel * '  '}{fn.__name__}({', '.join(_args)})")
             result = fn(*args, **kwargs)
             if result:
-                print('%s= %s' % (_tablevel*'  ', repr(result)))
+                print(f"{_tablevel * '  '}= {repr(result)}")
             _tablevel -= 1
             return result
+
         return _wrapper
 
     import types

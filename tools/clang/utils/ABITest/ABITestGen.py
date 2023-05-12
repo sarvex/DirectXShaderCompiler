@@ -201,17 +201,16 @@ class TypePrinter:
         if isinstance(t, BuiltinType):
             if t.name=='float':
                 for i in ['0.0','-1.0','1.0']:
-                    yield i+'f'
+                    yield f'{i}f'
             elif t.name=='double':
-                for i in ['0.0','-1.0','1.0']:
-                    yield i
+                yield from ['0.0','-1.0','1.0']
             elif t.name in ('void *'):
                 yield '(void*) 0'
                 yield '(void*) -1'
             else:
-                yield '(%s) 0'%(t.name,)
-                yield '(%s) -1'%(t.name,)
-                yield '(%s) 1'%(t.name,)
+                yield f'({t.name}) 0'
+                yield f'({t.name}) -1'
+                yield f'({t.name}) 1'
         elif isinstance(t, EnumType):
             for i in range(0, len(t.enumerators)):
                 yield 'enum%dval%d_%d' % (t.index, i, t.unique_id)
@@ -239,18 +238,18 @@ class TypePrinter:
 
         elif isinstance(t, ComplexType):
             for t in self.getTestValues(t.elementType):
-                yield '%s + %s * 1i'%(t,t)
+                yield f'{t} + {t} * 1i'
         elif isinstance(t, ArrayType):
             values = list(self.getTestValues(t.elementType))
             if not values:
                 yield '{ }'
             for i in range(t.numElements):
                 for v in values:
-                    elements = [random.choice(values) for i in range(t.numElements)]
+                    elements = [random.choice(values) for _ in range(t.numElements)]
                     elements[i] = v
                     yield '{ %s }'%(', '.join(elements))
         else:
-            raise NotImplementedError,'Cannot make tests values of type: "%s"'%(t,)
+            raise (NotImplementedError, f'Cannot make tests values of type: "{t}"')
 
     def printSizeOfType(self, prefix, name, t, output=None, indent=2):
         print >>output, '%*sprintf("%s: sizeof(%s) = %%ld\\n", (long)sizeof(%s));'%(indent, '', prefix, name, name) 

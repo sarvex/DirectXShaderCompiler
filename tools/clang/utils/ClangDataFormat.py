@@ -51,17 +51,22 @@ class SourceLocation(object):
 		return getValueFromExpression(self.srcloc, ".isMacroID()").GetValueAsUnsigned()
 
 	def isLocal(self, srcmgr_path):
-		return self.frame.EvaluateExpression("(%s).isLocalSourceLocation(%s)" % (srcmgr_path, getExpressionPath(self.srcloc))).GetValueAsUnsigned()
+		return self.frame.EvaluateExpression(
+			f"({srcmgr_path}).isLocalSourceLocation({getExpressionPath(self.srcloc)})"
+		).GetValueAsUnsigned()
 
 	def getPrint(self, srcmgr_path):
-		print_str = getValueFromExpression(self.srcloc, ".printToString(%s)" % srcmgr_path)
+		print_str = getValueFromExpression(
+			self.srcloc, f".printToString({srcmgr_path})"
+		)
 		return print_str.GetSummary()
 
 	def summary(self):
 		if self.isInvalid():
 			return "<invalid loc>"
-		srcmgr_path = findObjectExpressionPath("clang::SourceManager", self.frame)
-		if srcmgr_path:
+		if srcmgr_path := findObjectExpressionPath(
+			"clang::SourceManager", self.frame
+		):
 			return "%s (offset: %d, %s, %s)" % (self.getPrint(srcmgr_path), self.offset(), "macro" if self.isMacro() else "file", "local" if self.isLocal(srcmgr_path) else "loaded")
 		return "(offset: %d, %s)" % (self.offset(), "macro" if self.isMacro() else "file")
 
@@ -75,9 +80,7 @@ class QualType(object):
 
 	def summary(self):
 		desc = self.getAsString()
-		if desc == '"NULL TYPE"':
-			return "<NULL TYPE>"
-		return desc
+		return "<NULL TYPE>" if desc == '"NULL TYPE"' else desc
 
 class StringRef(object):
 	def __init__(self, strref):
@@ -91,9 +94,7 @@ class StringRef(object):
 		data = self.Data_value.GetPointeeData(0, self.Length)
 		error = lldb.SBError()
 		string = data.ReadRawData(error, 0, data.GetByteSize())
-		if error.Fail():
-			return None
-		return '"%s"' % string
+		return None if error.Fail() else f'"{string}"'
 
 
 # Key is a (function address, type name) tuple, value is the expression path for
@@ -106,11 +107,7 @@ def findObjectExpressionPath(typename, frame):
 	try:
 		return FramePathMapCache[key]
 	except KeyError:
-		#print "CACHE MISS"
-		path = None
-		obj = findObject(typename, frame)
-		if obj:
-			path = getExpressionPath(obj)
+		path = getExpressionPath(obj) if (obj := findObject(typename, frame)) else None
 		FramePathMapCache[key] = path
 		return path
 

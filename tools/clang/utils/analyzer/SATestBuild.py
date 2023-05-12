@@ -60,13 +60,12 @@ def detectCPUs():
     """
     # Linux, Unix and MacOS:
     if hasattr(os, "sysconf"):
-        if os.sysconf_names.has_key("SC_NPROCESSORS_ONLN"):
-            # Linux & Unix:
-            ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
-            if isinstance(ncpus, int) and ncpus > 0:
-                return ncpus
-        else: # OSX:
+        if not os.sysconf_names.has_key("SC_NPROCESSORS_ONLN"):
             return int(capture(['sysctl', '-n', 'hw.ncpu']))
+        # Linux & Unix:
+        ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
+        if isinstance(ncpus, int) and ncpus > 0:
+            return ncpus
     # Windows:
     if os.environ.has_key("NUMBER_OF_PROCESSORS"):
         ncpus = int(os.environ["NUMBER_OF_PROCESSORS"])
@@ -239,17 +238,20 @@ def runScanBuild(Dir, SBOutputDir, PBuildLogFile):
 
 def hasNoExtension(FileName):
     (Root, Ext) = os.path.splitext(FileName)
-    if ((Ext == "")) :
-        return True
-    return False
+    return Ext == ""
 
 def isValidSingleInputFile(FileName):
     (Root, Ext) = os.path.splitext(FileName)
-    if ((Ext == ".i") | (Ext == ".ii") | 
-        (Ext == ".c") | (Ext == ".cpp") | 
-        (Ext == ".m") | (Ext == "")) :
-        return True
-    return False
+    return bool(
+        (
+            (Ext == ".i")
+            | (Ext == ".ii")
+            | (Ext == ".c")
+            | (Ext == ".cpp")
+            | (Ext == ".m")
+            | (Ext == "")
+        )
+    )
    
 # Run analysis on a set of preprocessed files.
 def runAnalyzePreprocessed(Dir, SBOutputDir, Mode):
@@ -360,9 +362,9 @@ def buildProject(Dir, SBOutputDir, ProjectBuildMode, IsReferenceBuild):
 # A plist file is created for each call to the analyzer(each source file).
 # We are only interested on the once that have bug reports, so delete the rest.        
 def CleanUpEmptyPlists(SBOutputDir):
-    for F in glob.glob(SBOutputDir + "/*/*.plist"):
+    for F in glob.glob(f"{SBOutputDir}/*/*.plist"):
         P = os.path.join(SBOutputDir, F)
-        
+
         Data = plistlib.readPlist(P)
         # Delete empty reports.
         if not Data['files']:

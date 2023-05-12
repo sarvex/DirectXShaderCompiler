@@ -210,12 +210,8 @@ def StripComments(line, multiline_comment_continued = False):
     if multiline_comment_continued:
         # in multiline comment, only look for end of that
         idx = line.find('*/')
-        if idx < 0:
-            return '', True
-        return StripComments(line[idx+2:])
-    # look for start of multiline comment or eol comment:
-    m = rxCommentStart.search(line)
-    if m:
+        return ('', True) if idx < 0 else StripComments(line[idx+2:])
+    if m := rxCommentStart.search(line):
         if m.group(1) == '/*':
             line_end, multiline_comment_continued = StripComments(line[m.end(1):], True)
             return line[:m.start(1)] + line_end, multiline_comment_continued
@@ -224,8 +220,7 @@ def StripComments(line, multiline_comment_continued = False):
     return line, False
 
 def CountBraces(line, bracestacks):
-    m = rxStrings.search(line)
-    if m:
+    if m := rxStrings.search(line):
         CountBraces(line[:m.start(1)], bracestacks)
         CountBraces(line[m.end(2):], bracestacks)
         return
@@ -264,7 +259,8 @@ def ProcessStatementOrBlock(lines, start, fn_process):
 
 def CommentStatementOrBlock(lines, start):
     def fn_process(line):
-        return '//  ' + line
+        return f'//  {line}'
+
     return ProcessStatementOrBlock(lines, start, fn_process)
 
 def ParseVerifierTestCpp():
@@ -273,6 +269,7 @@ def ParseVerifierTestCpp():
     FoundTest = None
     def fn_null(line):
         return line
+
     def fn_process(line):
         searching = FoundTest is not None
         if searching:
@@ -281,6 +278,7 @@ def ParseVerifierTestCpp():
                 tests[FoundTest] = m.group(1)
                 searching = False
         return line
+
     with open(HlslVerifierTestCpp, 'rt') as f:
         lines = f.readlines()
         start = 0
@@ -290,7 +288,7 @@ def ParseVerifierTestCpp():
                 FoundTest = m.group(1)
                 start += ProcessStatementOrBlock(lines, start, fn_process)
                 if FoundTest not in tests:
-                    print('Could not parse file for test %s' % FoundTest)
+                    print(f'Could not parse file for test {FoundTest}')
                 FoundTest = None
             else:
                 start += ProcessStatementOrBlock(lines, start, fn_null)
@@ -332,7 +330,7 @@ class SourceLocation(object):
                     sloc += ', line:%d:%d' % (self.ToLine, self.ToCol)
                 else:
                     sloc += ', col:%d' % self.ToCol
-        return '<' + sloc + '>'
+        return f'<{sloc}>'
 
 class AstNode(object):
     def __init__(self, name, sloc, prefix, text, indent=''):
@@ -342,18 +340,16 @@ class AstNode(object):
         "convert to string relative to specified line"
         if self.name == '<<<NULL>>>':
             return self.name
-        return ('%s %s%s %s' % (self.name, self.prefix, self.sloc.ToStringAtLine(line), self.text)).strip()
+        return f'{self.name} {self.prefix}{self.sloc.ToStringAtLine(line)} {self.text}'.strip()
 
 def WalkAstChildren(ast_root):
     "yield each child node in the ast tree in depth-first order"
     for node in ast_root.children:
         yield node
-        for child in WalkAstChildren(node):
-            yield child
+        yield from WalkAstChildren(node)
 
 def WriteAstSubtree(ast_root, line, indent=''):
-    output = []
-    output.append(indent + ast_root.ToStringAtLine(line))
+    output = [indent + ast_root.ToStringAtLine(line)]
     if not ast_root.sloc.Invalid and ast_root.sloc.FromLine:
         line = ast_root.sloc.FromLine
     root_indent_len = len(ast_root.indent)
@@ -365,13 +361,13 @@ def WriteAstSubtree(ast_root, line, indent=''):
 
 def FindAstNodesByLine(ast_root, line):
     nodes = []
-    if not ast_root.sloc.Invalid and ast_root.sloc.FromLine == line:
-        return [ast_root]
-    if not ast_root.sloc.Invalid and ast_root.sloc.ToLine and ast_root.sloc.ToLine < line:
-        return []
+    if not ast_root.sloc.Invalid:
+        if ast_root.sloc.FromLine == line:
+            return [ast_root]
+        if ast_root.sloc.ToLine and ast_root.sloc.ToLine < line:
+            return []
     for child in ast_root.children:
-        sub_nodes = FindAstNodesByLine(child, line)
-        if sub_nodes:
+        if sub_nodes := FindAstNodesByLine(child, line):
             nodes += sub_nodes
     return nodes
 
@@ -507,8 +503,7 @@ class File(object):
                 line = line[:diag_col] + ('%s-%s {{%s}} ' % (prefix, ew, message)) + line[diag_col:]
         return line.rstrip()
     def SortDiags(self, line):
-        matches = list(rxDiag.finditer(line))
-        if matches:
+        if matches := list(rxDiag.finditer(line)):
             for m in sorted(matches, key=lambda m: m.start(), reverse=True):
                 line = line[:m.start()] + line[m.end():]
                 diag_col = m.start()
@@ -519,12 +514,10 @@ class File(object):
     def OutputResult(self):
         temp_filename = os.path.expandvars(r'${TEMP}\%s' % os.path.split(self.filename)[1])
         with open(self.filename, 'rt') as fin:
-            with open(temp_filename+'.result', 'wt') as fout:
-                line_num = 0
-                for line in fin.readlines():
+            with open(f'{temp_filename}.result', 'wt') as fout:
+                for line_num, line in enumerate(fin, start=1):
                     if line[-1] == '\n':
                         line = line[:-1]
-                    line_num += 1
                     line, expected, diag_col = self.RemoveDiags(line, self.expected.get(line_num, []))
                     for ew, message in expected:
                         print('Error: Line %d: Could not find: expected-%s {{%s}}!!' % (line_num, ew, message))
@@ -535,19 +528,18 @@ class File(object):
     def TryFxc(self, result_filename=None):
         temp_filename = os.path.expandvars(r'${TEMP}\%s' % os.path.split(self.filename)[1])
         if result_filename is None:
-            result_filename = temp_filename + '.fxc'
+            result_filename = f'{temp_filename}.fxc'
         inlines = []
         with open(self.filename, 'rt') as fin:
-            for line in fin.readlines():
+            for line in fin:
                 if line[-1] == '\n':
                     line = line[:-1]
                 inlines.append(line)
         verify_arguments = None
         for line in inlines:
-            m = rxVerifyArguments.search(line)
-            if m:
+            if m := rxVerifyArguments.search(line):
                 verify_arguments = m.group(1)
-                print('Found :FXC_VERIFY_ARGUMENTS: %s' % verify_arguments)
+                print(f'Found :FXC_VERIFY_ARGUMENTS: {verify_arguments}')
                 break
 
         # result will hold the final result after adding fxc error messages
@@ -570,7 +562,7 @@ class File(object):
         # diags_by_line is a dictionary of a set of errors and warnings keyed off line_num
         diags_by_line = {}
         while True:
-            with open(temp_filename+'.fxc_temp', 'wt') as fout:
+            with open(f'{temp_filename}.fxc_temp', 'wt') as fout:
                 fout.write('\n'.join(commented))
                 if verify_arguments is None:
                     fout.write("\n[numthreads(1,1,1)] void _test_main() {  }\n")
@@ -578,13 +570,22 @@ class File(object):
                 args = '/E _test_main /T cs_5_1'.split()
             else:
                 args = verify_arguments.split()
-            fxcres = subprocess.run(['%s' % FxcPath,
-                                     temp_filename + '.fxc_temp',
-                                     *args, "/nologo", "/DVERIFY_FXC=1",
-                                     "/Fo", temp_filename + '.fxo',
-                                     "/Fe", temp_filename + '.err'],
-                                    capture_output=True, text=True)
-            with open(temp_filename+'.err', 'rt') as f:
+            fxcres = subprocess.run(
+                [
+                    f'{FxcPath}',
+                    f'{temp_filename}.fxc_temp',
+                    *args,
+                    "/nologo",
+                    "/DVERIFY_FXC=1",
+                    "/Fo",
+                    f'{temp_filename}.fxo',
+                    "/Fe",
+                    f'{temp_filename}.err',
+                ],
+                capture_output=True,
+                text=True,
+            )
+            with open(f'{temp_filename}.err', 'rt') as f:
                 errors = [m for m in map(rxFxcErr.match, f.readlines()) if m]
             errors = sorted(errors, key=lambda m: int(m.group(2)))
             first_error = None
@@ -594,7 +595,9 @@ class File(object):
                     first_error = line_num
                 elif first_error and line_num > first_error:
                     break
-                diags_by_line.setdefault(line_num, set()).add((m.group(5), m.group(6) + ': ' + m.group(7)))
+                diags_by_line.setdefault(line_num, set()).add(
+                    (m.group(5), f'{m.group(6)}: {m.group(7)}')
+                )
             if first_error and first_error <= len(commented):
                 CommentStatementOrBlock(commented, first_error-1)
             else:
@@ -622,7 +625,7 @@ class File(object):
     def TryAst(self, result_filename=None):
         temp_filename = os.path.expandvars(r'${TEMP}\%s' % os.path.split(self.filename)[1])
         if result_filename is None:
-            result_filename = temp_filename + '.ast'
+            result_filename = f'{temp_filename}.ast'
         try:    os.unlink(result_filename)
         except: pass
         result = subprocess.run(['%s\\dxc.exe' % HlslBinDir,
@@ -631,20 +634,20 @@ class File(object):
                                 capture_output=True, text=True)
         # dxc dumps ast even if there exists any syntax error. If there is any error, dxc returns some nonzero errorcode.
         if not result.stdout:
-            with open("%s.log" % temp_filename, "wt") as f:
+            with open(f"{temp_filename}.log", "wt") as f:
                 f.write(result.stderr)
             print('ast-dump failed, see log:\n  "%s.log"' % (temp_filename))
             return
         try:
             ast_root = ParseAst(result.stdout.splitlines())
         except:
-            with open("%s" % result_filename, "wt") as f:
+            with open(f"{result_filename}", "wt") as f:
                 f.write(result.stdout)
-            print('ParseAst failed on "%s"' % (result_filename))
+            print(f'ParseAst failed on "{result_filename}"')
             raise
         inlines = []
         with open(self.filename, 'rt') as fin:
-            for line in fin.readlines():
+            for line in fin:
                 if line[-1] == '\n':
                     line = line[:-1]
                 inlines.append(line)
@@ -653,17 +656,13 @@ class File(object):
         while i < len(inlines):
             line = inlines[i]
             outlines.append(line)
-            m = rxVerifyAst.match(line)
-            if m:
-                indent = line[:m.start(1)] + '  '
-                # at this point i is the ONE based source line number
-                # (since it's one past the line we want to verify in zero based index)
-                ast_nodes = FindAstNodesByLine(ast_root, i)
-                if not ast_nodes:
-                    outlines += [indent + 'No matching AST found for line!']
-                else:
+            if m := rxVerifyAst.match(line):
+                indent = f'{line[:m.start(1)]}  '
+                if ast_nodes := FindAstNodesByLine(ast_root, i):
                     for ast in ast_nodes:
                         outlines += WriteAstSubtree(ast, i, indent)
+                else:
+                    outlines += [f'{indent}No matching AST found for line!']
                 while i+1 < len(inlines) and not rxEndVerifyAst.match(inlines[i+1]):
                     i += 1
             i += 1
@@ -683,11 +682,9 @@ def ProcessVerifierOutput(lines):
             continue
         if line[-1] == '\n':
             line = line[:-1]
-        m = rxRUN.match(line)
-        if m:
+        if m := rxRUN.match(line):
             cur_test = m.group(1)
-        m = rxForProgram.match(line)
-        if m:
+        if m := rxForProgram.match(line):
             cur_filename = m.group(1)
             files[cur_filename] = File(cur_filename)
             state = 'WaitingForCategory'
@@ -696,23 +693,20 @@ def ProcessVerifierOutput(lines):
             m = rxEndGroup.match(line)
             if m and m.group(2) == 'Failed':
                 # This usually happens when compiler crashes
-                print('Fatal Error: test %s failed without verifier results.' % cur_test)
-        if state == 'WaitingForCategory' or state == 'ReadingErrors':
-            m = rxExpected.match(line)
-            if m:
+                print(f'Fatal Error: test {cur_test} failed without verifier results.')
+        if state in ['WaitingForCategory', 'ReadingErrors']:
+            if m := rxExpected.match(line):
                 ew = m.group(1)
                 expected = m.group(2) == 'expected but not seen'
                 state = 'ReadingErrors'
                 continue
         if state == 'ReadingErrors':
-            m = rxDiagReport.match(line)
-            if m:
+            if m := rxDiagReport.match(line):
                 line_num = int(m.group(2))
                 if expected:
                     files[cur_filename].AddExpected(line_num, ew, m.group(3))
                 else:
                     files[cur_filename].AddUnexpected(line_num, ew, m.group(3))
-                continue
     for f in files.values():
         f.OutputResult()
     return files
@@ -740,7 +734,7 @@ def PrintUsage():
         print(('    %%-%ds  %%s' % width) % (name, VerifierTests[name]))
     print('Tests incompatible with fxc mode:')
     for name in fxcExcludedTests:
-        print('    %s' % name)
+        print(f'    {name}')
 
 def RunVerifierTest(test, HlslDataDir=HlslDataDir):
     import codecs
@@ -759,60 +753,13 @@ def main(*args):
         VerifierTests = ParseVerifierTestCpp()
     except:
         print('Unable to parse tests from VerifierTest.cpp; using defaults')
-    if len(args) < 1 or (args[0][0] in '-/' and args[0][1:].lower() in ('h', '?', 'help')):
+    if not args or (
+        args[0][0] in '-/' and args[0][1:].lower() in ('h', '?', 'help')
+    ):
         PrintUsage()
         return -1
     mode = args[0]
-    if mode == 'fxc':
-        allFxcTests = sorted(filter(lambda key: key not in fxcExcludedTests, VerifierTests.keys()))
-        if args[1] == '*':
-            tests = allFxcTests
-        else:
-            if args[1] not in allFxcTests:
-                PrintUsage()
-                return -1
-            tests = [args[1]]
-        differences = False
-        for test in tests:
-            print('---- %s ----' % test)
-            filename = os.path.join(HlslDataDir, VerifierTests[test])
-            result_filename = os.path.expandvars(r'${TEMP}\%s.fxc' % os.path.split(filename)[1])
-            File(filename).TryFxc()
-            differences = maybe_compare(filename, result_filename) or differences
-        if not differences:
-            print('No differences found!')
-    elif mode == 'clang':
-        if args[1] != '*' and args[1] not in VerifierTests:
-            PrintUsage()
-            return -1
-        files = ProcessVerifierOutput(RunVerifierTest(args[1]))
-        differences = False
-        if files:
-            for f in files.values():
-                if f.expected or f.unexpected:
-                    result_filename = os.path.expandvars(r'${TEMP}\%s.result' % os.path.split(f.filename)[1])
-                    differences = maybe_compare(f.filename, result_filename) or differences
-        if not differences:
-            print('No differences found!')
-    elif mode == 'ast':
-        allAstTests = sorted(VerifierTests.keys())
-        if args[1] == '*':
-            tests = allAstTests
-        else:
-            if args[1] not in allAstTests:
-                PrintUsage()
-                return -1
-            tests = [args[1]]
-        differences = False
-        for test in tests:
-            print('---- %s ----' % test)
-            filename = os.path.join(HlslDataDir, VerifierTests[test])
-            result_filename = os.path.expandvars(r'${TEMP}\%s.ast' % os.path.split(filename)[1])
-            File(filename).TryAst()
-            differences = maybe_compare(filename, result_filename) or differences
-        if not differences:
-            print('No differences found!')
-    elif mode == 'all':
+    if mode == 'all':
         allTests = sorted(VerifierTests.keys())
         if args[1] == '*':
             tests = allTests
@@ -824,8 +771,7 @@ def main(*args):
 
         # Do clang verifier tests, updating source file paths for changed files:
         sourceFiles = dict([(VerifierTests[test], os.path.join(HlslDataDir, VerifierTests[test])) for test in tests])
-        files = ProcessVerifierOutput(RunVerifierTest(args[1]))
-        if files:
+        if files := ProcessVerifierOutput(RunVerifierTest(args[1])):
             for f in files.values():
                 if f.expected or f.unexpected:
                     name = os.path.split(f.filename)[1]
@@ -850,6 +796,55 @@ def main(*args):
                 File(sourceFile).TryFxc(result_filename)
                 sourceFiles[name] = result_filename
             differences = maybe_compare(os.path.join(HlslDataDir, name), sourceFiles[name]) or differences
+        if not differences:
+            print('No differences found!')
+    elif mode == 'ast':
+        allAstTests = sorted(VerifierTests.keys())
+        if args[1] == '*':
+            tests = allAstTests
+        else:
+            if args[1] not in allAstTests:
+                PrintUsage()
+                return -1
+            tests = [args[1]]
+        differences = False
+        for test in tests:
+            print(f'---- {test} ----')
+            filename = os.path.join(HlslDataDir, VerifierTests[test])
+            result_filename = os.path.expandvars(r'${TEMP}\%s.ast' % os.path.split(filename)[1])
+            File(filename).TryAst()
+            differences = maybe_compare(filename, result_filename) or differences
+        if not differences:
+            print('No differences found!')
+    elif mode == 'clang':
+        if args[1] != '*' and args[1] not in VerifierTests:
+            PrintUsage()
+            return -1
+        files = ProcessVerifierOutput(RunVerifierTest(args[1]))
+        differences = False
+        if files:
+            for f in files.values():
+                if f.expected or f.unexpected:
+                    result_filename = os.path.expandvars(r'${TEMP}\%s.result' % os.path.split(f.filename)[1])
+                    differences = maybe_compare(f.filename, result_filename) or differences
+        if not differences:
+            print('No differences found!')
+    elif mode == 'fxc':
+        allFxcTests = sorted(filter(lambda key: key not in fxcExcludedTests, VerifierTests.keys()))
+        if args[1] == '*':
+            tests = allFxcTests
+        else:
+            if args[1] not in allFxcTests:
+                PrintUsage()
+                return -1
+            tests = [args[1]]
+        differences = False
+        for test in tests:
+            print(f'---- {test} ----')
+            filename = os.path.join(HlslDataDir, VerifierTests[test])
+            result_filename = os.path.expandvars(r'${TEMP}\%s.fxc' % os.path.split(filename)[1])
+            File(filename).TryFxc()
+            differences = maybe_compare(filename, result_filename) or differences
         if not differences:
             print('No differences found!')
     else:

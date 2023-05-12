@@ -27,9 +27,8 @@ def saveCaptureData(prefix, dir, object):
     path = os.path.join(dir,
                         prefix + key)
     if not os.path.exists(path):
-        f = open(path, 'wb')
-        f.write(string)
-        f.close()
+        with open(path, 'wb') as f:
+            f.write(string)
     return prefix + key
 
 def main():

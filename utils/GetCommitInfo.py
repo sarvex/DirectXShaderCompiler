@@ -29,9 +29,8 @@ def compose_commit_namespace(git_count, git_hash):
 def update(srcdir, commit_file):
     # Read the original commit info
     try:
-        f = open(commit_file)
-        prev_commit = f.read()
-        f.close()
+        with open(commit_file) as f:
+            prev_commit = f.read()
     except:
         prev_commit = ''
 

@@ -12,9 +12,7 @@ def to_bytes(str):
     return str.encode('utf-8')
 
 def to_string(bytes):
-    if isinstance(bytes, str):
-        return bytes
-    return to_bytes(bytes)
+    return bytes if isinstance(bytes, str) else to_bytes(bytes)
 
 def convert_string(bytes):
     try:
@@ -28,13 +26,12 @@ def detectCPUs():
     """
     # Linux, Unix and MacOS:
     if hasattr(os, "sysconf"):
-        if "SC_NPROCESSORS_ONLN" in os.sysconf_names:
-            # Linux & Unix:
-            ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
-            if isinstance(ncpus, int) and ncpus > 0:
-                return ncpus
-        else: # OSX:
+        if "SC_NPROCESSORS_ONLN" not in os.sysconf_names:
             return int(capture(['sysctl', '-n', 'hw.ncpu']))
+        # Linux & Unix:
+        ncpus = os.sysconf("SC_NPROCESSORS_ONLN")
+        if isinstance(ncpus, int) and ncpus > 0:
+            return ncpus
     # Windows:
     if "NUMBER_OF_PROCESSORS" in os.environ:
         ncpus = int(os.environ["NUMBER_OF_PROCESSORS"])
@@ -100,21 +97,22 @@ def which(command, paths = None):
     return None
 
 def checkToolsPath(dir, tools):
-    for tool in tools:
-        if not os.path.exists(os.path.join(dir, tool)):
-            return False;
-    return True;
+    return all(os.path.exists(os.path.join(dir, tool)) for tool in tools)
 
 def whichTools(tools, paths):
-    for path in paths.split(os.pathsep):
-        if checkToolsPath(path, tools):
-            return path
-    return None
+    return next(
+        (
+            path
+            for path in paths.split(os.pathsep)
+            if checkToolsPath(path, tools)
+        ),
+        None,
+    )
 
 def printHistogram(items, title = 'Items'):
     items.sort(key = lambda item: item[1])
 
-    maxValue = max([v for _,v in items])
+    maxValue = max(v for _,v in items)
 
     # Select first "nice" bar height that produces more than 10 bars.
     power = int(math.ceil(math.log(maxValue, 10)))
@@ -126,7 +124,7 @@ def printHistogram(items, title = 'Items'):
         elif inc == 1:
             power -= 1
 
-    histo = [set() for i in range(N)]
+    histo = [set() for _ in range(N)]
     for name,v in items:
         bin = min(int(N * v/maxValue), N-1)
         histo[bin].add(name)
@@ -144,9 +142,9 @@ def printHistogram(items, title = 'Items'):
     if pfDigits:
         pDigits += pfDigits + 1
     cDigits = int(math.ceil(math.log(len(items), 10)))
-    print("[%s] :: [%s] :: [%s]" % ('Range'.center((pDigits+1)*2 + 3),
-                                    'Percentage'.center(barW),
-                                    'Count'.center(cDigits*2 + 1)))
+    print(
+        f"[{'Range'.center((pDigits + 1) * 2 + 3)}] :: [{'Percentage'.center(barW)}] :: [{'Count'.center(cDigits * 2 + 1)}]"
+    )
     print(hr)
     for i,row in enumerate(histo):
         pct = float(len(row)) / len(items)
@@ -157,7 +155,7 @@ def printHistogram(items, title = 'Items'):
 
 # Close extra file handles on UNIX (on Windows this cannot be done while
 # also redirecting input).
-kUseCloseFDs = not (platform.system() == 'Windows')
+kUseCloseFDs = platform.system() != 'Windows'
 def executeCommand(command, cwd=None, env=None):
     p = subprocess.Popen(command, cwd=cwd,
                          stdin=subprocess.PIPE,

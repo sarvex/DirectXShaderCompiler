@@ -44,8 +44,9 @@ class SmallVectorSynthProvider:
             return None;
 
         offset = index * self.type_size
-        return self.begin.CreateChildAtOffset('['+str(index)+']',
-                                              offset, self.data_type)
+        return self.begin.CreateChildAtOffset(
+            f'[{str(index)}]', offset, self.data_type
+        )
 
     def update(self):
         self.begin = self.valobj.GetChildMemberWithName('BeginX')
@@ -79,8 +80,7 @@ class ArrayRefSynthProvider:
         if index < 0 or index >= self.num_children():
             return None;
         offset = index * self.type_size
-        return self.data.CreateChildAtOffset('[' + str(index) + ']',
-                                             offset, self.data_type)
+        return self.data.CreateChildAtOffset(f'[{str(index)}]', offset, self.data_type)
 
     def update(self):
         self.data = self.valobj.GetChildMemberWithName('Data')

@@ -66,18 +66,14 @@ def extract_result_types(comment):
      parsed.
   """
   result_types = []
-  m = re.search(r'Usable as: Any Matcher[\s\n]*$', comment, re.S)
-  if m:
+  if m := re.search(r'Usable as: Any Matcher[\s\n]*$', comment, re.S):
     return ['*']
   while True:
     m = re.match(r'^(.*)Matcher<([^>]+)>\s*,?[\s\n]*$', comment, re.S)
     if not m:
-      if re.search(r'Usable as:\s*$', comment):
-        return result_types
-      else:
-        return None
-    result_types += [m.group(2)]
-    comment = m.group(1)
+      return result_types if re.search(r'Usable as:\s*$', comment) else None
+    result_types += [m[2]]
+    comment = m[1]
 
 def strip_doxygen(comment):
   """Returns the given comment without \-escaped words."""
@@ -104,11 +100,11 @@ def add_matcher(result_type, name, args, comment, is_dyncast=False):
   ids[name] += 1
   args = unify_arguments(args)
   matcher_html = TD_TEMPLATE % {
-    'result': esc('Matcher<%s>' % result_type),
-    'name': name,
-    'args': esc(args),
-    'comment': esc(strip_doxygen(comment)),
-    'id': matcher_id,
+      'result': esc(f'Matcher<{result_type}>'),
+      'name': name,
+      'args': esc(args),
+      'comment': esc(strip_doxygen(comment)),
+      'id': matcher_id,
   }
   if is_dyncast:
     node_matchers[result_type + name] = matcher_html
@@ -302,9 +298,7 @@ def act_on_decl(declaration, comment, allowed_types):
 
 def sort_table(matcher_type, matcher_map):
   """Returns the sorted html table for the given row map."""
-  table = ''
-  for key in sorted(matcher_map.keys()):
-    table += matcher_map[key] + '\n'
+  table = ''.join(matcher_map[key] + '\n' for key in sorted(matcher_map.keys()))
   return ('<!-- START_%(type)s_MATCHERS -->\n' +
           '%(table)s' + 
           '<!--END_%(type)s_MATCHERS -->') % {
@@ -334,13 +328,13 @@ for line in open(MATCHERS_FILE).read().splitlines():
       body = False
     else:
       m = re.search(r'is_base_of<([^,]+), NodeType>', line)
-      if m and m.group(1):
-        allowed_types += [m.group(1)]
+      if m and m[1]:
+        allowed_types += [m[1]]
     continue
   if line.strip() and line.lstrip()[0] == '/':
     comment += re.sub(r'/+\s?', '', line) + '\n'
   else:
-    declaration += ' ' + line
+    declaration += f' {line}'
     if ((not line.strip()) or 
         line.rstrip()[-1] == ';' or
         (line.rstrip()[-1] == '{' and line.rstrip()[-3:] != '= {')):

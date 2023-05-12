@@ -74,7 +74,7 @@ def sort_includes(f):
   llvm_headers = sorted(set(llvm_headers))
   system_headers = sorted(set(system_headers))
   headers = api_headers + local_headers + subproject_headers + llvm_headers + system_headers
-  header_lines = ['#include ' + h for h in headers]
+  header_lines = [f'#include {h}' for h in headers]
   lines = lines[:headers_begin] + header_lines + lines[headers_end + 1:]
 
   f.seek(0)

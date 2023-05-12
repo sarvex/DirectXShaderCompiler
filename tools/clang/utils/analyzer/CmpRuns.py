@@ -66,8 +66,8 @@ class AnalysisDiagnostic:
     def getDescription(self):
         return self._data['description']
 
-    def getIssueIdentifier(self) :
-        id = self.getFileName() + "+"
+    def getIssueIdentifier(self):
+        id = f"{self.getFileName()}+"
         if 'issue_context' in self._data :
           id += self._data['issue_context'] + "+"
         if 'issue_hash' in self._data :
@@ -145,7 +145,7 @@ class AnalysisRun:
         # reports. Assume that all reports were created using the same 
         # clang version (this is always true and is more efficient).
         if 'clang_version' in data:
-            if self.clang_version == None:
+            if self.clang_version is None:
                 self.clang_version = data.pop('clang_version')
             else:
                 data.pop('clang_version')
@@ -166,7 +166,7 @@ class AnalysisRun:
                 htmlFiles.append(d.pop('HTMLDiagnostics_files')[0])
         else:
             htmlFiles = [None] * len(data['diagnostics'])
-            
+
         report = AnalysisReport(self, data.pop('files'))
         diagnostics = [AnalysisDiagnostic(d, report, h) 
                        for d,h in zip(data.pop('diagnostics'),
@@ -246,11 +246,8 @@ def compareResults(A, B):
     # basis for matching. This has the nice property that we don't depend in any
     # way on the diagnostic format.
 
-    for a in neqA:
-        res.append((a, None, None))
-    for b in neqB:
-        res.append((None, b, None))
-
+    res.extend((a, None, None) for a in neqA)
+    res.extend((None, b, None) for b in neqB)
     return res
 
 def dumpScanBuildResultsDiff(dirA, dirB, opts, deleteEmpty=True):

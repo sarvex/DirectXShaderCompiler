@@ -32,7 +32,7 @@ def parse_time(value):
         seconds,fseconds = value.split('.',1)
     else:
         seconds = value
-    return int(minutes) * 60 + int(seconds) + float('.'+fseconds)
+    return int(minutes) * 60 + int(seconds) + float(f'.{fseconds}')
 
 def extractExecutable(command):
     """extractExecutable - Given a string representing a command line, attempt
@@ -76,7 +76,7 @@ def getProcessTable():
     if p.wait():
         error('unable to get process table')
     elif err.strip():
-        error('unable to get process table: %s' % err)
+        error(f'unable to get process table: {err}')
 
     lns = out.split('\n')
     it = iter(lns)
@@ -129,10 +129,11 @@ def getSignalValue(name):
     error('unknown signal: %r' % name)
 
 import signal
-kSignals = {}
-for name in dir(signal):
-    if name.startswith('SIG') and name == name.upper() and name.isalpha():
-        kSignals[name[3:]] = getattr(signal, name)
+kSignals = {
+    name[3:]: getattr(signal, name)
+    for name in dir(signal)
+    if name.startswith('SIG') and name == name.upper() and name.isalpha()
+}
 
 def main():
     global opts

@@ -18,13 +18,11 @@ def VerifyLineLength(filename, lines, max_length):
     violations found.
   """
   lint = []
-  line_num = 1
-  for line in lines:
+  for line_num, line in enumerate(lines, start=1):
     length = len(line.rstrip('\n'))
     if length > max_length:
       lint.append((filename, line_num,
                    'Line exceeds %d chars (%d)' % (max_length, length)))
-    line_num += 1
   return lint
 
 def VerifyTabs(filename, lines):
@@ -38,14 +36,10 @@ def VerifyTabs(filename, lines):
     A list of tuples with format [(line_number, msg), ...] with any violations
     found.
   """
-  lint = []
   tab_re = re.compile(r'\t')
-  line_num = 1
-  for line in lines:
-    if tab_re.match(line.rstrip('\n')):
-      lint.append((filename, line_num, 'Tab found instead of whitespace'))
-    line_num += 1
-  return lint
+  return [(filename, line_num, 'Tab found instead of whitespace')
+          for line_num, line in enumerate(lines, start=1)
+          if tab_re.match(line.rstrip('\n'))]
 
 
 def VerifyTrailingWhitespace(filename, lines):
@@ -59,18 +53,14 @@ def VerifyTrailingWhitespace(filename, lines):
     A list of tuples with format [(filename, line number, msg), ...] with any
     violations found.
   """
-  lint = []
   trailing_whitespace_re = re.compile(r'\s+$')
-  line_num = 1
-  for line in lines:
-    if trailing_whitespace_re.match(line.rstrip('\n')):
-      lint.append((filename, line_num, 'Trailing whitespace'))
-    line_num += 1
-  return lint
+  return [(filename, line_num, 'Trailing whitespace')
+          for line_num, line in enumerate(lines, start=1)
+          if trailing_whitespace_re.match(line.rstrip('\n'))]
 
 
 class BaseLint:
-  def RunOnFile(filename, lines):
+  def RunOnFile(self, lines):
     raise Exception('RunOnFile() unimplemented')
 
 

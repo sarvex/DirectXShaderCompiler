@@ -18,8 +18,9 @@ import re
 
 def llc(args, cmd_args, ir):
   with open(ir) as ir_file:
-    stdout = subprocess.check_output(args.llc_binary + ' ' + cmd_args,
-                                     shell=True, stdin=ir_file)
+    stdout = subprocess.check_output(f'{args.llc_binary} {cmd_args}',
+                                     shell=True,
+                                     stdin=ir_file)
   return stdout
 
 

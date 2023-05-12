@@ -43,10 +43,7 @@ class ShLexer:
         return chunk
         
     def lex_arg_slow(self, c):
-        if c in "'\"":
-            str = self.lex_arg_quoted(c)
-        else:
-            str = c
+        str = self.lex_arg_quoted(c) if c in "'\"" else c
         while self.pos != self.end:
             c = self.look()
             if c.isspace() or c in "|&;":
@@ -135,28 +132,19 @@ class ShLexer:
         if c == ';':
             return (c,)
         if c == '|':
-            if self.maybe_eat('|'):
-                return ('||',)
-            return (c,)
+            return ('||', ) if self.maybe_eat('|') else (c, )
         if c == '&':
             if self.maybe_eat('&'):
                 return ('&&',)
-            if self.maybe_eat('>'): 
-                return ('&>',)
-            return (c,)
+            return ('&>', ) if self.maybe_eat('>') else (c, )
         if c == '>':
             if self.maybe_eat('&'):
                 return ('>&',)
-            if self.maybe_eat('>'):
-                return ('>>',)
-            return (c,)
+            return ('>>', ) if self.maybe_eat('>') else (c, )
         if c == '<':
             if self.maybe_eat('&'):
                 return ('<&',)
-            if self.maybe_eat('>'):
-                return ('<<',)
-            return (c,)
-
+            return ('<<', ) if self.maybe_eat('>') else (c, )
         return self.lex_arg(c)
 
     def lex(self):
@@ -191,7 +179,7 @@ class ShParser:
             raise ValueError("empty command!")
         if isinstance(tok, tuple):
             raise ValueError("syntax error near unexpected token %r" % tok[0])
-        
+
         args = [tok]
         redirects = []
         while 1:
@@ -210,14 +198,14 @@ class ShParser:
             assert isinstance(tok, tuple)
             if tok[0] in ('|',';','&','||','&&'):
                 break
-            
+
             # Otherwise it must be a redirection.
             op = self.lex()
-            arg = self.lex()
-            if not arg:
-                raise ValueError("syntax error near token %r" % op[0])
-            redirects.append((op, arg))
+            if arg := self.lex():
+                redirects.append((op, arg))
 
+            else:
+                raise ValueError("syntax error near token %r" % op[0])
         return Command(args, redirects)
 
     def parse_pipeline(self):

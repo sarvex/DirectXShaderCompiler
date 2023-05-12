@@ -108,21 +108,13 @@ def path_without_wrapper():
 def flip_dash_g(args):
     """Search for -g in args. If it exists then return args without. If not then
     add it."""
-    if '-g' in args:
-        # Return args without any -g
-        return [x for x in args if x != '-g']
-    else:
-        # No -g, add one
-        return args + ['-g']
+    return [x for x in args if x != '-g'] if '-g' in args else args + ['-g']
 
 def derive_output_file(args):
     """Derive output file from the input file (if just one) or None
     otherwise."""
     infile = get_input_file(args)
-    if infile is None:
-        return None
-    else:
-        return '{}.o'.format(os.path.splitext(infile)[0])
+    return None if infile is None else f'{os.path.splitext(infile)[0]}.o'
 
 def get_output_file(args):
     """Return the output file specified by this command or None if not
@@ -162,7 +154,7 @@ def replace_output_file(args, new_name):
         raise Exception
     replacement = new_name
     if attached == True:
-        replacement = '-o' + new_name
+        replacement = f'-o{new_name}'
     args[replaceidx] = replacement
     return args
 
@@ -184,7 +176,7 @@ gSrcFileSuffixes = ('.c', '.cpp', '.cxx', '.c++', '.cp', '.cc')
 def get_input_file(args):
     """Return the input file string if it can be found (and there is only
     one)."""
-    inputFiles = list()
+    inputFiles = []
     for arg in args:
         testarg = arg
         quotes = ('"', "'")
@@ -195,15 +187,11 @@ def get_input_file(args):
         # Test if it is a source file
         if testarg.endswith(gSrcFileSuffixes):
             inputFiles.append(arg)
-    if len(inputFiles) == 1:
-        return inputFiles[0]
-    else:
-        return None
+    return inputFiles[0] if len(inputFiles) == 1 else None
 
 def set_input_file(args, input_file):
     """Replaces the input file with that specified."""
-    infile = get_input_file(args)
-    if infile:
+    if infile := get_input_file(args):
         infile_idx = args.index(infile)
         args[infile_idx] = input_file
         return args
@@ -263,12 +251,10 @@ class dash_g_no_change(WrapperCheck):
         alternate_command = set_output_file(alternate_command, output_file_b)
         run_step(alternate_command, my_env, "Error compiling with -g")
 
-        # Compare disassembly (returns first diff if differs)
-        difference = obj_diff.compare_object_files(self._output_file_a,
-                                                   output_file_b)
-        if difference:
-            raise WrapperCheckException(
-                "Code difference detected with -g\n{}".format(difference))
+        if difference := obj_diff.compare_object_files(
+            self._output_file_a, output_file_b
+        ):
+            raise WrapperCheckException(f"Code difference detected with -g\n{difference}")
 
         # Clean up temp file if comparison okay
         os.remove(output_file_b)
@@ -287,19 +273,17 @@ class dash_s_no_change(WrapperCheck):
         # Compare if object files are exactly the same
         exactly_equal = obj_diff.compare_exact(self._output_file_a, output_file_b)
         if not exactly_equal:
-            # Compare disassembly (returns first diff if differs)
-            difference = obj_diff.compare_object_files(self._output_file_a,
-                                                       output_file_b)
-            if difference:
-                raise WrapperCheckException(
-                    "Code difference detected with -S\n{}".format(difference))
+            if difference := obj_diff.compare_object_files(
+                self._output_file_a, output_file_b
+            ):
+                raise WrapperCheckException(f"Code difference detected with -S\n{difference}")
 
-            # Code is identical, compare debug info
-            dbgdifference = obj_diff.compare_debug_info(self._output_file_a,
-                                                        output_file_b)
-            if dbgdifference:
+            if dbgdifference := obj_diff.compare_debug_info(
+                self._output_file_a, output_file_b
+            ):
                 raise WrapperCheckException(
-                    "Debug info difference detected with -S\n{}".format(dbgdifference))
+                    f"Debug info difference detected with -S\n{dbgdifference}"
+                )
 
             raise WrapperCheckException("Object files not identical with -S\n")
 
@@ -316,7 +300,7 @@ if __name__ == '__main__':
     checks = [cls.__name__ for cls in vars()['WrapperCheck'].__subclasses__()]
 
     for c in checks:
-        default_config += "{} = false\n".format(c)
+        default_config += f"{c} = false\n"
 
     config = ConfigParser.RawConfigParser()
     config.readfp(io.BytesIO(default_config))
@@ -325,8 +309,7 @@ if __name__ == '__main__':
     try:
         config.read(os.path.join(config_path))
     except:
-        print("Could not read config from {}, "
-              "using defaults.".format(config_path))
+        print(f"Could not read config from {config_path}, using defaults.")
 
     my_env = os.environ.copy()
     my_env['PATH'] = path_without_wrapper()
@@ -341,7 +324,7 @@ if __name__ == '__main__':
                       for check_name in checks
                       if config.getboolean('Checks', check_name)]
     checks_comma_separated = ', '.join(enabled_checks)
-    print("Check CFC, checking: {}".format(checks_comma_separated))
+    print(f"Check CFC, checking: {checks_comma_separated}")
 
     # A - original compilation
     output_file_orig = get_output_file(arguments_a)
@@ -381,7 +364,7 @@ if __name__ == '__main__':
                 checker.perform_check(arguments_a, my_env)
             except WrapperCheckException as e:
                 # Check failure
-                print("{} {}".format(get_input_file(arguments_a), e.msg), file=sys.stderr)
+                print(f"{get_input_file(arguments_a)} {e.msg}", file=sys.stderr)
 
                 # Remove file to comply with build system expectations (no
                 # output file if failed)

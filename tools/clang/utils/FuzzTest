@@ -21,7 +21,7 @@ class TestGenerator:
         self.pick_input = bool(pick_input)
         self.insert_strings = list(insert_strings)
 
-        self.num_positions = sum([len(d) for _,d in self.inputs])
+        self.num_positions = sum(len(d) for _,d in self.inputs)
         self.num_insert_strings = len(insert_strings)
         self.num_tests = ((delete + (insert + replace)*self.num_insert_strings)
                           * self.num_positions)
@@ -74,9 +74,7 @@ class TestApplication:
         self.test = test
 
     def apply(self):
-        if self.test[0] == 'nothing':
-            pass
-        else:
+        if self.test[0] != 'nothing':
             i,j = self.test[1]
             name,data = self.tg.inputs[i]
             if self.test[0] == 'delete':
@@ -96,7 +94,7 @@ class TestApplication:
             open(name,'wb').write(data)
 
 def quote(str):
-    return '"' + str + '"'
+    return f'"{str}"'
         
 def run_one_test(test_application, index, input_files, args):
     test = test_application.test

@@ -607,7 +607,7 @@ def findClosestTOCEntry(data, target):
             section,name = name.split(' ',1)
             if section == 'Annex':
                 section,name = name.split(' ',1)
-                section = 'Annex '+section
+                section = f'Annex {section}'
         else:
             section = None
         try:
@@ -633,17 +633,15 @@ def findClosestLineReference(clangRoot, doxyName, target):
         f = open(os.path.join(clangRoot, 'docs', 'doxygen', 'html', doxyName))
     except:
         return None
-    
+
     best = None
     for m in doxyLineRefRE.finditer(f.read()):
         line = int(m.group(1), 10)
         dist = abs(line - target)
         if best is None or dist < best[0]:
-            best = (dist,'l'+m.group(1))
+            best = dist, f'l{m.group(1)}'
     f.close()
-    if best is not None:
-        return best[1]
-    return None
+    return best[1] if best is not None else None
 
 ###
 
@@ -681,8 +679,7 @@ class SpecIndex:
         if str[0] == '[':
             assert ']' in str
             secs = str[1:str.index(']')].split('.')
-            tail = str[str.index(']')+1:]
-            if tail:
+            if tail := str[str.index(']') + 1 :]:
                 assert tail[0] == 'p'
                 paragraph = int(tail[1:])
             else:
@@ -709,7 +706,7 @@ class SpecIndex:
         return s                            
 
     def __repr__(self):
-        return 'SpecIndex(%s, %s)'%(self.indices, self.paragraph)
+        return f'SpecIndex({self.indices}, {self.paragraph})'
 
     def __cmp__(self, b):
         return cmp((self.indices,self.paragraph),
@@ -735,9 +732,9 @@ class RefItem:
     
     def __str__(self):
         if self.name is not None:
-            return '%s %s'%(self.name, self.section)
+            return f'{self.name} {self.section}'
         else:
-            return '--- %s'%(self.section,)
+            return f'--- {self.section}'
 
     def __repr__(self):
         return 'RefItem(%s, %r, "%s", "%s", %d)'%(self.name, 
@@ -756,8 +753,7 @@ class RefItem:
 ###
 
 def sorted(l):
-    l = list(l)
-    l.sort()
+    l = sorted(l)
     return l
 
 def getRevision(path):
@@ -765,10 +761,14 @@ def getRevision(path):
     p = subprocess.Popen(['svn', 'info', path],
                          stdin=open('/dev/null','r'), 
                          stdout=subprocess.PIPE)
-    for ln in p.stdout.read(1024).split('\n'):
-        if ln.startswith('Revision:'):
-            return ln.split(':',1)[1].strip()
-    return None
+    return next(
+        (
+            ln.split(':', 1)[1].strip()
+            for ln in p.stdout.read(1024).split('\n')
+            if ln.startswith('Revision:')
+        ),
+        None,
+    )
 
 def buildRefTree(references):
     root = (None, {}, [])
@@ -797,8 +797,7 @@ def preorder(node,parents=(),first=True):
     if first:
         yield parents+(node,)
     for c in children:
-        for item in preorder(c, parents+(node,)):
-            yield item
+        yield from preorder(c, parents+(node,))
 
 def main():
     global options

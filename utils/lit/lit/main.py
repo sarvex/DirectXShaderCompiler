@@ -43,7 +43,7 @@ class TestingProgressDisplay(object):
                                     test.getFullName())
 
         shouldShow = test.result.code.isFailure or \
-            (not self.opts.quiet and not self.opts.succinct)
+                (not self.opts.quiet and not self.opts.succinct)
         if not shouldShow:
             return
 
@@ -57,18 +57,16 @@ class TestingProgressDisplay(object):
 
         # Show the test failure output, if requested.
         if test.result.code.isFailure and self.opts.showOutput:
-            print("%s TEST '%s' FAILED %s" % ('*'*20, test.getFullName(),
-                                              '*'*20))
+            print(f"{'*' * 20} TEST '{test.getFullName()}' FAILED {'*' * 20}")
             print(test.result.output)
             print("*" * 20)
 
         # Report test metrics, if present.
         if test.result.metrics:
-            print("%s TEST '%s' RESULTS %s" % ('*'*10, test.getFullName(),
-                                               '*'*10))
+            print(f"{'*' * 10} TEST '{test.getFullName()}' RESULTS {'*' * 10}")
             items = sorted(test.result.metrics.items())
             for metric_name, value in items:
-                print('%s: %s ' % (metric_name, value.format()))
+                print(f'{metric_name}: {value.format()} ')
             print("*" * 10)
 
         # Ensure the output is flushed.
@@ -81,10 +79,7 @@ def write_test_results(run, lit_config, testing_time, output_path):
         lit_config.fatal('test output unsupported with Python 2.5')
 
     # Construct the data we will write.
-    data = {}
-    # Encode the current lit version as a schema version.
-    data['__version__'] = lit.__versioninfo__
-    data['elapsed'] = testing_time
+    data = {'__version__': lit.__versioninfo__, 'elapsed': testing_time}
     # FIXME: Record some information on the lit configuration used?
     # FIXME: Record information from the individual test suites?
 

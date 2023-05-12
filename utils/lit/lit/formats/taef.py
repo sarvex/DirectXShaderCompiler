@@ -106,10 +106,9 @@ class TaefTest(TestFormat):
         self.test_searched = True
 
         filepath = self.test_dll
-        for test in self.getTestsInExecutable(
-                testSuite, path_in_suite, filepath,
-                litConfig, localConfig):
-            yield test
+        yield from self.getTestsInExecutable(
+            testSuite, path_in_suite, filepath, litConfig, localConfig
+        )
 
     def execute(self, test, litConfig):
         test_dll = test.getFilePath()

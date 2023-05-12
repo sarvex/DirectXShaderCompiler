@@ -100,7 +100,7 @@ class JSONMetricValue(MetricValue):
 def toMetricValue(value):
     if isinstance(value, MetricValue):
         return value
-    elif isinstance(value, int) or isinstance(value, long):
+    elif isinstance(value, (int, long)):
         return IntMetricValue(value)
     elif isinstance(value, float):
         return RealMetricValue(value)
@@ -194,12 +194,10 @@ class Test:
                 self.result.code = XFAIL
         
     def getFullName(self):
-        return self.suite.config.name + ' :: ' + '/'.join(self.path_in_suite)
+        return f'{self.suite.config.name} :: ' + '/'.join(self.path_in_suite)
 
     def getFilePath(self):
-        if self.file_path:
-            return self.file_path
-        return self.getSourcePath()
+        return self.file_path if self.file_path else self.getSourcePath()
 
     def getSourcePath(self):
         return self.suite.getSourcePath(self.path_in_suite)
@@ -241,12 +239,11 @@ class Test:
         safe_name = self.suite.name.replace(".","-")
 
         if safe_test_path:
-            class_name = safe_name + "." + "/".join(safe_test_path) 
+            class_name = f"{safe_name}." + "/".join(safe_test_path)
         else:
-            class_name = safe_name + "." + safe_name
+            class_name = f"{safe_name}.{safe_name}"
 
-        xml = "<testcase classname='" + class_name + "' name='" + \
-            test_name + "'"
+        xml = f"<testcase classname='{class_name}' name='{test_name}'"
         xml += " time='%.2f'" % (self.result.elapsed,)
         if self.result.code.isFailure:
             xml += ">\n\t<failure >\n" + escape(self.result.output)

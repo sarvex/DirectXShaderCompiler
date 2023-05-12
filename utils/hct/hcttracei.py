@@ -27,10 +27,12 @@ ns = {'e': 'http://schemas.microsoft.com/win/2004/08/events/event'}
 def write_basic_info(node):
     '''Writes computer information'''
     print("Basic information:")
-    print("CPU Speed: %s" % node.find("e:Data[@Name='CPUSpeed']", ns). text)
-    print("Processor count: %s" % node.find("e:Data[@Name='NumberOfProcessors']", ns). text)
-    print("Events lost: %s" % node.find("e:Data[@Name='EventsLost']", ns). text)
-    print("Pointer size: %s" % node.find("e:Data[@Name='PointerSize']", ns). text)
+    print(f"""CPU Speed: {node.find("e:Data[@Name='CPUSpeed']", ns).text}""")
+    print(
+        f"""Processor count: {node.find("e:Data[@Name='NumberOfProcessors']", ns).text}"""
+    )
+    print(f"""Events lost: {node.find("e:Data[@Name='EventsLost']", ns).text}""")
+    print(f"""Pointer size: {node.find("e:Data[@Name='PointerSize']", ns).text}""")
 
 
 def write_compile_times(root):
